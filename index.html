@@ -77,35 +77,33 @@ html,body{
 <div id="startOverlay">
  <div>
   <h2>✨ Tap to Start ✨</h2>
-  <p>Allow camera & audio</p>
+  <p>Allow camera access</p>
   <button id="startBtn">Start Experience</button>
  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <script>
-/* ================= BASIC SETUP ================= */
-const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x060014,0.0012);
+/* ================= THREE SETUP ================= */
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x060014,0.0012);
 
-const camera = new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
-camera.position.z = 500;
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
+camera.position.z=500;
 
-const renderer = new THREE.WebGLRenderer({antialias:false});
+const renderer=new THREE.WebGLRenderer({antialias:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 renderer.setSize(innerWidth,innerHeight);
 document.getElementById("container").appendChild(renderer.domElement);
 
 /* ================= STARS ================= */
-const COUNT = innerWidth < 768 ? 1400 : 3200;
-const geo = new THREE.BufferGeometry();
-
-const pos = new Float32Array(COUNT*3);
-const galaxy = new Float32Array(COUNT*3);
-const shape = new Float32Array(COUNT*3);
+const COUNT=innerWidth<768?1400:3200;
+const geo=new THREE.BufferGeometry();
+const pos=new Float32Array(COUNT*3);
+const galaxy=new Float32Array(COUNT*3);
+const shape=new Float32Array(COUNT*3);
 
 for(let i=0;i<COUNT;i++){
  galaxy[i*3]=(Math.random()-0.5)*1800;
@@ -114,14 +112,13 @@ for(let i=0;i<COUNT;i++){
  pos.set(galaxy);
  shape.set(galaxy);
 }
-
 geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
 
-const stars = new THREE.Points(
+const stars=new THREE.Points(
  geo,
  new THREE.PointsMaterial({
   color:0xffffff,
-  size: innerWidth < 768 ? 2.4 : 1.8,
+  size:innerWidth<768?2.4:1.8,
   transparent:true,
   opacity:0.95,
   blending:THREE.AdditiveBlending
@@ -130,7 +127,7 @@ const stars = new THREE.Points(
 scene.add(stars);
 
 /* ================= NEBULA ================= */
-const nebula = new THREE.Points(
+const nebula=new THREE.Points(
  geo.clone(),
  new THREE.PointsMaterial({
   color:0x5522ff,
@@ -143,21 +140,20 @@ const nebula = new THREE.Points(
 scene.add(nebula);
 
 /* ================= GALAXY MOTION ================= */
-const orbitRadius = new Float32Array(COUNT);
-const orbitSpeed  = new Float32Array(COUNT);
-const orbitAngle  = new Float32Array(COUNT);
-const driftZ      = new Float32Array(COUNT);
+const orbitRadius=new Float32Array(COUNT);
+const orbitSpeed=new Float32Array(COUNT);
+const orbitAngle=new Float32Array(COUNT);
+const driftZ=new Float32Array(COUNT);
 
 for(let i=0;i<COUNT;i++){
- orbitRadius[i] = Math.random()*500+200;
- orbitSpeed[i]  = Math.random()*0.0006+0.0002;
- orbitAngle[i]  = Math.random()*Math.PI*2;
- driftZ[i]      = Math.random()*Math.PI*2;
+ orbitRadius[i]=Math.random()*500+200;
+ orbitSpeed[i]=Math.random()*0.0006+0.0002;
+ orbitAngle[i]=Math.random()*Math.PI*2;
+ driftZ[i]=Math.random()*Math.PI*2;
 }
 
 /* ================= BLEND ================= */
-let blend=0;
-let targetBlend=0;
+let blend=0,targetBlend=0;
 
 /* ================= COLORS ================= */
 const messageColors={
@@ -174,8 +170,8 @@ function buildShape(draw){
  const c=document.createElement("canvas");
  const ctx=c.getContext("2d");
 
- c.width = innerHeight>innerWidth ? 380 : 900;
- c.height= innerHeight>innerWidth ? 560 : 420;
+ c.width=innerHeight>innerWidth?380:900;
+ c.height=innerHeight>innerWidth?560:420;
 
  ctx.fillStyle="#000";
  ctx.fillRect(0,0,c.width,c.height);
@@ -208,19 +204,19 @@ function buildShape(draw){
 }
 
 /* ================= TEXT ================= */
-function textMorph(txt){
+function textMorph(t){
  buildShape((ctx,c)=>{
   ctx.fillStyle="#fff";
   ctx.textAlign="center";
   ctx.textBaseline="top";
   ctx.font=(innerHeight>innerWidth?26:34)+"px Playfair Display";
-  txt.split("\n").forEach((l,i)=>{
+  t.split("\n").forEach((l,i)=>{
    ctx.fillText(l,c.width/2,40+i*44);
   });
  });
 }
 
-/* ================= HEART 3D ================= */
+/* ================= HEART ================= */
 function heartMorph(){
  buildShape((ctx,c)=>{
   ctx.fillStyle="#fff";
@@ -238,9 +234,7 @@ function heartMorph(){
 }
 
 /* ================= RESET ================= */
-function resetGalaxy(){
- targetBlend=0;
-}
+function resetGalaxy(){targetBlend=0}
 
 /* ================= CAMERA ================= */
 let camPhase=Math.random()*Math.PI*2;
@@ -262,7 +256,6 @@ function animate(){
  if(Math.abs(targetBlend-blend)<0.01)blend=targetBlend;
 
  const p=geo.attributes.position.array;
-
  for(let i=0;i<COUNT;i++){
   orbitAngle[i]+=orbitSpeed[i];
   const gx=galaxy[i*3]+Math.cos(orbitAngle[i])*orbitRadius[i];
@@ -273,7 +266,6 @@ function animate(){
   p[i*3+1]=gy+(shape[i*3+1]-gy)*blend;
   p[i*3+2]=gz+(shape[i*3+2]-gz)*blend;
  }
-
  geo.attributes.position.needsUpdate=true;
 
  nebula.rotation.z+=0.0004;
@@ -284,35 +276,47 @@ function animate(){
 }
 animate();
 
-/* ================= HAND ================= */
+/* ================= MEDIAPIPE HANDS ================= */
 const video=document.getElementById("video");
 const status=document.getElementById("gestureStatus");
 
-const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-hands.setOptions({maxNumHands:1,selfieMode:true,minDetectionConfidence:.75});
+const hands=new Hands({
+ locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+hands.setOptions({
+ maxNumHands:1,
+ selfieMode:true,
+ modelComplexity:0,
+ minDetectionConfidence:0.7,
+ minTrackingConfidence:0.7
+});
+
+function fingerExtended(tip,pip,mcp){
+ const d1=Math.hypot(tip.x-pip.x,tip.y-pip.y);
+ const d2=Math.hypot(pip.x-mcp.x,pip.y-mcp.y);
+ return d1>d2*0.85;
+}
 
 let last=null,lastT=0;
-function ext(t,p,m){
- return Math.atan2(t.y-p.y,t.x-p.x)<Math.atan2(p.y-m.y,p.x-m.x);
-}
 
 hands.onResults(r=>{
  if(!r.multiHandLandmarks){
   resetGalaxy();
   status.textContent="Detecting…";
-  last=null;
   return;
  }
+
  const lm=r.multiHandLandmarks[0];
  let f=0;
- if(ext(lm[8],lm[6],lm[5]))f++;
- if(ext(lm[12],lm[10],lm[9]))f++;
- if(ext(lm[16],lm[14],lm[13]))f++;
- if(ext(lm[20],lm[18],lm[17]))f++;
+ if(fingerExtended(lm[8],lm[6],lm[5]))f++;
+ if(fingerExtended(lm[12],lm[10],lm[9]))f++;
+ if(fingerExtended(lm[16],lm[14],lm[13]))f++;
+ if(fingerExtended(lm[20],lm[18],lm[17]))f++;
+
  const g=f===0?"fist":f;
  const now=Date.now();
 
- if(g!==last && now-lastT>900){
+ if(g!==last && now-lastT>800){
   last=g;lastT=now;
   stars.material.color.setHex(messageColors[g]||0xffffff);
 
@@ -332,16 +336,20 @@ hands.onResults(r=>{
 /* ================= START ================= */
 document.getElementById("startBtn").onclick=async()=>{
  document.getElementById("startOverlay").style.display="none";
+
  const stream=await navigator.mediaDevices.getUserMedia({
   video:{facingMode:"user",width:640,height:480}
  });
  video.srcObject=stream;
  await video.play();
- new Camera(video,{
-  onFrame:()=>hands.send({image:video}),
-  width:640,
-  height:480
- }).start();
+
+ async function processFrame(){
+  if(video.readyState>=2){
+   await hands.send({image:video});
+  }
+  requestAnimationFrame(processFrame);
+ }
+ processFrame();
 };
 </script>
 </body>
