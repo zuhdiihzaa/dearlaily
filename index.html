@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cosmic Gesture Message – Stable Mobile</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Cosmic Gesture – Stable</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap" rel="stylesheet">
 
 <style>
 html,body{
  margin:0;
  padding:0;
- background:#000;
+ background:black;
  overflow:hidden;
  font-family:'Playfair Display',serif;
 }
 #container{position:fixed;inset:0}
-#status{
+#hud{
  position:fixed;
  top:10px;
  left:50%;
@@ -24,328 +24,211 @@ html,body{
  color:#fff;
  font-size:13px;
  opacity:.8;
- z-index:5;
+ z-index:10;
 }
-#camBox{
+#cam{
  position:fixed;
  bottom:12px;
  right:12px;
- width:110px;
- height:150px;
+ width:120px;
+ height:160px;
  border-radius:14px;
  overflow:hidden;
- border:1.5px solid rgba(255,255,255,.35);
- box-shadow:0 0 18px rgba(255,255,255,.25);
- z-index:5;
+ border:1px solid rgba(255,255,255,.4);
+ z-index:10;
 }
-#camBox video{
+#cam video{
  width:100%;
  height:100%;
  object-fit:cover;
  transform:scaleX(-1);
 }
-#overlay{
+#start{
  position:fixed;
  inset:0;
- z-index:10;
- background:radial-gradient(circle,#1a0033,#000);
+ background:radial-gradient(circle,#220033,#000);
  display:flex;
  align-items:center;
  justify-content:center;
+ z-index:20;
  color:#fff;
  text-align:center;
 }
-#overlay button{
- margin-top:20px;
- padding:14px 30px;
+#start button{
+ padding:14px 32px;
+ font-size:18px;
  border-radius:40px;
  border:none;
- font-size:18px;
- cursor:pointer;
 }
 </style>
 </head>
 <body>
 
 <div id="container"></div>
-<div id="status">Searching hand…</div>
+<div id="hud">Loading model…</div>
 
-<div id="camBox">
- <video id="video" playsinline></video>
-</div>
+<div id="cam"><video id="video" playsinline></video></div>
 
-<div id="overlay">
+<div id="start">
  <div>
-  <h2>✨ Tap to Begin ✨</h2>
-  <p>Allow camera access</p>
-  <button id="start">Start</button>
+  <h2>✨ Tap to Start ✨</h2>
+  <p>Allow camera</p>
+  <button>Start</button>
  </div>
 </div>
 
+<!-- THREE -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+
+<!-- TFJS -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
 
 <script>
-/* ================= DEVICE DETECT ================= */
-const IS_MOBILE=/Android|iPhone|iPad/i.test(navigator.userAgent);
-const STAR_COUNT=IS_MOBILE?1000:2600;
-
 /* ================= THREE ================= */
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x070015,0.0013);
+scene.fog=new THREE.FogExp2(0x050010,0.0012);
 
 const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
 camera.position.z=520;
 
-const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:"low-power"});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.4));
+const renderer=new THREE.WebGLRenderer({antialias:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 renderer.setSize(innerWidth,innerHeight);
 document.getElementById("container").appendChild(renderer.domElement);
 
-/* ================= STARS ================= */
-const geo=new THREE.BufferGeometry();
-const pos=new Float32Array(STAR_COUNT*3);
-const base=new Float32Array(STAR_COUNT*3);
-const shape=new Float32Array(STAR_COUNT*3);
+/* ================= PARTICLES ================= */
+const IS_MOBILE=/Android|iPhone/i.test(navigator.userAgent);
+const COUNT=IS_MOBILE?1600:3600;
 
-for(let i=0;i<STAR_COUNT;i++){
+const geo=new THREE.BufferGeometry();
+const pos=new Float32Array(COUNT*3);
+const base=new Float32Array(COUNT*3);
+const target=new Float32Array(COUNT*3);
+
+for(let i=0;i<COUNT;i++){
  base[i*3]=(Math.random()-0.5)*1800;
  base[i*3+1]=(Math.random()-0.5)*1800;
  base[i*3+2]=(Math.random()-0.5)*1800;
  pos.set(base);
- shape.set(base);
+ target.set(base);
 }
 geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
 
-const stars=new THREE.Points(
- geo,
- new THREE.PointsMaterial({
-  color:0xffffff,
-  size:IS_MOBILE?2.4:1.8,
-  transparent:true,
-  opacity:.95,
-  blending:THREE.AdditiveBlending
- })
-);
+const stars=new THREE.Points(geo,new THREE.PointsMaterial({
+ size:IS_MOBILE?2.3:1.8,
+ color:0xffffff,
+ transparent:true,
+ opacity:.95,
+ blending:THREE.AdditiveBlending
+}));
 scene.add(stars);
 
-/* ================= NEBULA ================= */
-const nebula=new THREE.Points(
- geo.clone(),
- new THREE.PointsMaterial({
-  color:0x6633ff,
-  size:3,
-  opacity:.06,
-  transparent:true,
-  blending:THREE.AdditiveBlending
- })
+/* ================= 3D TEXT ================= */
+let textMesh=null;
+const loader=new THREE.FontLoader();
+let font=null;
+
+loader.load(
+ "https://cdn.jsdelivr.net/npm/three@0.155.0/examples/fonts/helvetiker_regular.typeface.json",
+ f=>font=f
 );
-scene.add(nebula);
 
-/* ================= GALAXY MOTION ================= */
-const angle=new Float32Array(STAR_COUNT);
-const speed=new Float32Array(STAR_COUNT);
-const radius=new Float32Array(STAR_COUNT);
+function showText3D(txt,color){
+ if(!font)return;
+ if(textMesh)scene.remove(textMesh);
 
-for(let i=0;i<STAR_COUNT;i++){
- angle[i]=Math.random()*Math.PI*2;
- speed[i]=Math.random()*0.0005+0.0002;
- radius[i]=Math.random()*400+200;
-}
-
-/* ================= MORPH ================= */
-let blend=0,targetBlend=0;
-
-function resetGalaxy(){targetBlend=0}
-
-function buildShape(draw){
- const c=document.createElement("canvas");
- const ctx=c.getContext("2d");
- const portrait=innerHeight>innerWidth;
-
- c.width=portrait?380:900;
- c.height=portrait?560:420;
-
- ctx.fillStyle="#000";
- ctx.fillRect(0,0,c.width,c.height);
-
- ctx.fillStyle="#fff";
- ctx.shadowColor="#fff";
- ctx.shadowBlur=24;
-
- draw(ctx,c);
-
- const img=ctx.getImageData(0,0,c.width,c.height).data;
- let i=0,max=Math.floor(STAR_COUNT*0.65);
-
- for(let y=0;y<c.height;y+=4){
-  for(let x=0;x<c.width;x+=4){
-   if(img[(y*c.width+x)*4]>10 && i<max){
-    shape[i*3]=x-c.width/2;
-    shape[i*3+1]=c.height/2-y;
-    shape[i*3+2]=(Math.random()-0.5)*40;
-    i++;
-   }
-  }
- }
- for(;i<STAR_COUNT;i++){
-  shape[i*3]=base[i*3];
-  shape[i*3+1]=base[i*3+1];
-  shape[i*3+2]=base[i*3+2];
- }
- targetBlend=1;
-}
-
-function textShape(t){
- buildShape((ctx,c)=>{
-  ctx.textAlign="center";
-  ctx.textBaseline="top";
-  ctx.font=(innerHeight>innerWidth?26:34)+"px Playfair Display";
-  t.split("\n").forEach((l,i)=>{
-   ctx.fillText(l,c.width/2,40+i*44);
-  });
+ const geo=new THREE.TextGeometry(txt,{
+  font,
+  size:28,
+  height:10,
+  curveSegments:8
  });
-}
+ geo.center();
 
-function heartShape(){
- buildShape((ctx,c)=>{
-  ctx.translate(c.width/2,c.height/2);
-  ctx.scale(1.4,1.4);
-  ctx.beginPath();
-  ctx.moveTo(0,60);
-  ctx.bezierCurveTo(-120,-40,-60,-180,0,-80);
-  ctx.bezierCurveTo(60,-180,120,-40,0,60);
-  ctx.fill();
+ const mat=new THREE.MeshStandardMaterial({
+  color,
+  emissive:color,
+  emissiveIntensity:0.6
  });
- for(let i=0;i<STAR_COUNT;i++){
-  shape[i*3+2]+=Math.sin(i)*30;
- }
+
+ textMesh=new THREE.Mesh(geo,mat);
+ scene.add(textMesh);
 }
 
-/* ================= CAMERA CINEMATIC ================= */
-let camT=Math.random()*10;
-function cinematic(){
- camT+=0.0006;
- camera.position.x=Math.sin(camT)*70;
- camera.position.y=Math.cos(camT*0.8)*50;
- camera.position.z=520+Math.sin(camT*0.5)*40;
- camera.lookAt(0,0,0);
-}
+/* ================= LIGHT ================= */
+scene.add(new THREE.AmbientLight(0xffffff,.6));
+const l=new THREE.PointLight(0xff88ff,1.2);
+l.position.set(200,200,300);
+scene.add(l);
 
-/* ================= RENDER LOOP ================= */
-let t=0;
+/* ================= ANIMATE ================= */
+let blend=0,goal=0;
 function animate(){
  requestAnimationFrame(animate);
- t+=0.003;
-
- blend+=(targetBlend-blend)*0.025;
- if(Math.abs(targetBlend-blend)<0.01)blend=targetBlend;
+ blend+=(goal-blend)*0.02;
 
  const p=geo.attributes.position.array;
- for(let i=0;i<STAR_COUNT;i++){
-  angle[i]+=speed[i];
-  const gx=base[i*3]+Math.cos(angle[i])*radius[i];
-  const gy=base[i*3+1]+Math.sin(angle[i])*radius[i];
-  const gz=base[i*3+2]+Math.sin(t+i)*20;
-
-  p[i*3]=gx+(shape[i*3]-gx)*blend;
-  p[i*3+1]=gy+(shape[i*3+1]-gy)*blend;
-  p[i*3+2]=gz+(shape[i*3+2]-gz)*blend;
+ for(let i=0;i<COUNT;i++){
+  p[i*3]=base[i*3]+(target[i*3]-base[i*3])*blend;
+  p[i*3+1]=base[i*3+1]+(target[i*3+1]-base[i*3+1])*blend;
+  p[i*3+2]=base[i*3+2]+(target[i*3+2]-base[i*3+2])*blend;
  }
  geo.attributes.position.needsUpdate=true;
 
- nebula.rotation.z+=0.0003;
- nebula.rotation.y+=0.00015;
-
- cinematic();
+ stars.rotation.y+=0.0004;
  renderer.render(scene,camera);
 }
 animate();
 
-/* ================= MEDIAPIPE ================= */
+/* ================= HANDPOSE ================= */
+let model=null;
 const video=document.getElementById("video");
-const status=document.getElementById("status");
+const hud=document.getElementById("hud");
 
-const hands=new Hands({
- locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
-hands.setOptions({
- maxNumHands:1,
- modelComplexity:0,
- selfieMode:true,
- minDetectionConfidence:0.7,
- minTrackingConfidence:0.7
-});
-
-function ext(t,p,m){
- const d1=Math.hypot(t.x-p.x,t.y-p.y);
- const d2=Math.hypot(p.x-m.x,p.y-m.y);
- return d1>d2*0.85;
-}
-
-let lastSeen=Date.now();
-let stable=null,stableTime=0;
-
-hands.onResults(r=>{
- if(!r.multiHandLandmarks){
-  return;
- }
- lastSeen=Date.now();
- const lm=r.multiHandLandmarks[0];
- let f=0;
- if(ext(lm[8],lm[6],lm[5]))f++;
- if(ext(lm[12],lm[10],lm[9]))f++;
- if(ext(lm[16],lm[14],lm[13]))f++;
- if(ext(lm[20],lm[18],lm[17]))f++;
-
- const g=f===0?"fist":f;
- if(g===stable){
-  if(Date.now()-stableTime>450){
-   trigger(g);
-  }
+async function detect(){
+ if(!model)return;
+ const pred=await model.estimateHands(video,false);
+ if(pred.length){
+  hud.textContent="Hand detected";
+  handleGesture(pred[0].landmarks);
  }else{
-  stable=g;
-  stableTime=Date.now();
+  hud.textContent="Searching hand…";
+  goal=0;
  }
- status.textContent="Detected: "+g;
-});
-
-function trigger(g){
- stable=null;
- if(g===1)textShape(`Dear Laily Aliyah,\n\nI want to sincerely apologize\nfor the situation that happened.`);
- if(g===2)textShape(`I never intended to deceive you.\nI hope you can believe my sincerity.`);
- if(g===3)textShape(`I’m really sorry for the misunderstanding.`);
- if(g===4)heartShape();
- if(g===5)textShape(`ilysm ly ♥`);
- if(g==="fist")textShape(`from:\nRaja Iblis`);
+ requestAnimationFrame(detect);
 }
 
-/* ================= WATCHDOG ================= */
-setInterval(()=>{
- if(Date.now()-lastSeen>1200){
-  resetGalaxy();
-  status.textContent="Searching hand…";
- }
-},500);
+function handleGesture(lm){
+ const up=(a,b)=>lm[a][1]<lm[b][1];
+ let f=0;
+ if(up(8,6))f++;
+ if(up(12,10))f++;
+ if(up(16,14))f++;
+ if(up(20,18))f++;
 
-/* ================= CAMERA START ================= */
-document.getElementById("start").onclick=async()=>{
- document.getElementById("overlay").style.display="none";
+ goal=1;
+ if(f===1)showText3D("Dear Laily Aliyah",0xffa6c9);
+ if(f===2)showText3D("I never meant to hurt you",0xa6d8ff);
+ if(f===3)showText3D("I'm truly sorry",0xffd27d);
+ if(f===4)showText3D("♥",0xff4b6e);
+ if(f===5)showText3D("ilysm ly ♥",0xbaffc9);
+ if(f===0)showText3D("from: Raja Iblis",0xffffff);
+}
+
+/* ================= START ================= */
+document.querySelector("#start button").onclick=async()=>{
+ document.getElementById("start").style.display="none";
+
  const stream=await navigator.mediaDevices.getUserMedia({
-  video:{facingMode:"user",width:640,height:480}
+  video:{facingMode:"user"}
  });
  video.srcObject=stream;
  await video.play();
 
- let last=0;
- async function loop(time){
-  if(time-last>120){
-   last=time;
-   await hands.send({image:video});
-  }
-  requestAnimationFrame(loop);
- }
- loop(0);
+ model=await handpose.load();
+ hud.textContent="Model ready";
+ detect();
 };
 </script>
 </body>
