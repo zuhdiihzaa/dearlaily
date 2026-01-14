@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Romantic Star Gesture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Great+Vibes&display=swap" rel="stylesheet">
+
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: black;
+}
+canvas { position: absolute; inset: 0; }
+#video { display: none; }
+
+#hint {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Playfair Display', serif;
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+<div id="hint">click once to awaken the stars ✨</div>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<audio id="bgm" loop>
+  <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6b7d8c9d5c.mp3?filename=space-ambient-110397.mp3">
+</audio>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const video = document.getElementById("video");
+const bgm = document.getElementById("bgm");
+const hint = document.getElementById("hint");
+
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+onclick = () => { bgm.play(); hint.style.display = "none"; };
+
+const STAR_COUNT = 2800;
+let stars = [];
+let activeMode = null;
+let lastDetected = Date.now();
+let galaxyAngle = 0;
+let heartbeat = 0;
+
+class Star {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = Math.random()*canvas.width;
+    this.y = Math.random()*canvas.height;
+    this.tx = this.x;
+    this.ty = this.y;
+    this.alpha = Math.random();
+    this.size = Math.random()*1.8+0.4;
+    this.speed = Math.random()*0.02+0.01;
+  }
+  update() {
+    this.x += (this.tx-this.x)*this.speed;
+    this.y += (this.ty-this.y)*this.speed;
+  }
+  draw(glow=false) {
+    ctx.shadowBlur = glow ? 14 : 0;
+    ctx.shadowColor = "rgba(255,180,255,0.8)";
+    ctx.fillStyle = `rgba(255,255,255,${this.alpha})`;
+    ctx.fillRect(this.x,this.y,this.size,this.size);
+    ctx.shadowBlur = 0;
+  }
+}
+
+for(let i=0;i<STAR_COUNT;i++) stars.push(new Star());
+
+function drawNebula() {
+  const g = ctx.createRadialGradient(
+    canvas.width/2,canvas.height/2,100,
+    canvas.width/2,canvas.height/2,canvas.width
+  );
+  g.addColorStop(0,"rgba(120,60,160,0.25)");
+  g.addColorStop(0.5,"rgba(40,60,120,0.15)");
+  g.addColorStop(1,"rgba(0,0,0,0.5)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function drawConstellation() {
+  for(let i=0;i<stars.length;i+=18){
+    for(let j=i+1;j<i+6 && j<stars.length;j++){
+      const a=stars[i], b=stars[j];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<120){
+        ctx.strokeStyle=`rgba(255,255,255,${0.15-d/120})`;
+        ctx.beginPath();
+        ctx.moveTo(a.x,a.y);
+        ctx.lineTo(b.x,b.y);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function animate(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawNebula();
+
+  galaxyAngle+=0.0003;
+  ctx.save();
+  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.rotate(galaxyAngle);
+  ctx.translate(-canvas.width/2,-canvas.height/2);
+
+  drawConstellation();
+
+  stars.forEach(s=>{
+    s.update();
+    s.draw(activeMode!==null);
+  });
+
+  ctx.restore();
+
+  if(Date.now()-lastDetected>1500) resetSpace();
+  requestAnimationFrame(animate);
+}
+animate();
+
+function resetSpace(){
+  if(activeMode!==null){
+    activeMode=null;
+    stars.forEach(s=>s.reset());
+  }
+}
+
+function textPoints(text, romantic=false){
+  const off=document.createElement("canvas");
+  off.width=canvas.width;
+  off.height=canvas.height;
+  const o=off.getContext("2d");
+
+  o.fillStyle="white";
+  o.textAlign="center";
+  o.font= romantic ? "bold 54px 'Great Vibes'" : "36px 'Playfair Display'";
+  wrap(o,text,off.width/2,off.height/2,off.width*0.75,romantic?64:44);
+
+  const img=o.getImageData(0,0,off.width,off.height);
+  let pts=[];
+  for(let y=0;y<img.height;y+=4){
+    for(let x=0;x<img.width;x+=4){
+      if(img.data[(y*img.width+x)*4+3]>150) pts.push({x,y});
+    }
+  }
+  return pts;
+}
+
+function heartPoints(){
+  heartbeat+=0.03;
+  const scale=1+Math.sin(heartbeat)*0.06;
+  const pts=[];
+  const cx=canvas.width/2, cy=canvas.height/2;
+  for(let t=0;t<Math.PI*2;t+=0.02){
+    const x=16*Math.pow(Math.sin(t),3);
+    const y=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t));
+    pts.push({x:cx+x*15*scale,y:cy+y*15*scale});
+  }
+  return pts;
+}
+
+function apply(pts){
+  stars.forEach((s,i)=>{
+    const p=pts[i%pts.length];
+    s.tx=p.x; s.ty=p.y;
+  });
+}
+
+function wrap(ctx,text,x,y,max,line){
+  const w=text.split(" ");
+  let l="",arr=[];
+  for(let i=0;i<w.length;i++){
+    const t=l+w[i]+" ";
+    if(ctx.measureText(t).width>max){arr.push(l);l=w[i]+" ";}
+    else l=t;
+  }
+  arr.push(l);
+  arr.forEach((v,i)=>ctx.fillText(v,x,y+i*line));
+}
+
+const actions={
+1:()=>apply(textPoints(`Dear Laily Aliyah,
+I want to sincerely apologize for the situation that happened.
+I’m truly sorry if everything made you feel disappointed, confused, or hurt.
+What hurts me the most is knowing that you thought I was lying,
+even though I was being honest from the beginning.`)),
+2:()=>apply(textPoints(`I never intended to deceive you or break your trust in any way.
+I understand why you might have felt that way, and I respect your feelings.
+Still, I hope one day you can believe that my words were genuine
+and came from a sincere place.`)),
+3:()=>apply(textPoints(`I’m really sorry for the misunderstanding,
+and I truly hope we can clear things up
+and move forward with honesty and respect.`)),
+4:()=>apply(heartPoints()),
+5:()=>apply(textPoints(`ilysm ly ♥`,true)),
+fist:()=>apply(textPoints(`from: Raja Iblis`,true))
+};
+
+const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+hands.setOptions({maxNumHands:1,minDetectionConfidence:0.7,minTrackingConfidence:0.7});
+hands.onResults(r=>{
+  if(!r.multiHandLandmarks) return;
+  lastDetected=Date.now();
+  const lm=r.multiHandLandmarks[0];
+  const f=[
+    lm[4].x<lm[3].x,
+    lm[8].y<lm[6].y,
+    lm[12].y<lm[10].y,
+    lm[16].y<lm[14].y,
+    lm[20].y<lm[18].y
+  ];
+  const c=f.filter(v=>v).length;
+  if(c===0){actions.fist();activeMode="fist";}
+  else if(actions[c]&&activeMode!==c){actions[c]();activeMode=c;}
+});
+
+new Camera(video,{onFrame:async()=>await hands.send({image:video}),width:640,height:480}).start();
+</script>
+</body>
+</html>
