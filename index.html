@@ -1,240 +1,333 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Romantic Star Gesture</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>Cosmic Gesture Message</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Great+Vibes&display=swap" rel="stylesheet">
+  <!-- Google Font (romantic) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@0;1&family=Great+Vibes&display=swap" rel="stylesheet">
 
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: black;
-}
-canvas { position: absolute; inset: 0; }
-#video { display: none; }
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Playfair Display', serif;
+      color: white;
+      height: 100%;
+    }
 
-#hint {
-  position: fixed;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Playfair Display', serif;
-  color: rgba(255,255,255,0.6);
-  font-size: 13px;
-}
-</style>
+    #container {
+      position: fixed;
+      inset: 0;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    /* Overlay start */
+    #startOverlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, #1b0033, #000);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #startOverlay button {
+      font-size: 1.1rem;
+      padding: 16px 28px;
+      border-radius: 40px;
+      border: none;
+      background: linear-gradient(135deg, #ff9ad5, #b084ff);
+      color: #000;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(255,180,255,0.6);
+    }
+
+    /* Camera POV */
+    #cameraBox {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      width: 120px;
+      height: 160px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.4);
+      box-shadow: 0 0 15px rgba(180,150,255,0.6);
+      z-index: 5;
+      background: #000;
+    }
+
+    #cameraBox video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #cameraGuide {
+      position: absolute;
+      inset: 12px;
+      border: 1px dashed rgba(255,255,255,0.6);
+      border-radius: 10px;
+      pointer-events: none;
+    }
+
+    #gestureStatus {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.9rem;
+      opacity: 0.8;
+      z-index: 5;
+    }
+  </style>
 </head>
-
 <body>
-<div id="hint">click once to awaken the stars ✨</div>
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
 
+<div id="container"></div>
+
+<div id="gestureStatus">Detecting...</div>
+
+<div id="cameraBox">
+  <video id="video" playsinline></video>
+  <div id="cameraGuide"></div>
+</div>
+
+<div id="startOverlay">
+  <div>
+    <h2>✨ Tap to Start ✨</h2>
+    <p>Aktifkan kamera & audio<br>Arahkan tangan ke tengah kamera</p>
+    <button id="startBtn">Start Experience</button>
+  </div>
+</div>
+
+<!-- Audio -->
 <audio id="bgm" loop>
-  <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6b7d8c9d5c.mp3?filename=space-ambient-110397.mp3">
+  <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_4c3c3a1f1a.mp3" type="audio/mpeg">
 </audio>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const video = document.getElementById("video");
-const bgm = document.getElementById("bgm");
-const hint = document.getElementById("hint");
+/* =====================
+   THREE.JS SCENE
+===================== */
+let scene, camera, renderer, particles, geometry;
+const container = document.getElementById('container');
 
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+scene = new THREE.Scene();
 
-onclick = () => { bgm.play(); hint.style.display = "none"; };
+camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  1,
+  2000
+);
+camera.position.z = 400;
 
-const STAR_COUNT = 2800;
-let stars = [];
-let activeMode = null;
-let lastDetected = Date.now();
-let galaxyAngle = 0;
-let heartbeat = 0;
+renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(renderer.domElement);
 
-class Star {
-  constructor() { this.reset(); }
-  reset() {
-    this.x = Math.random()*canvas.width;
-    this.y = Math.random()*canvas.height;
-    this.tx = this.x;
-    this.ty = this.y;
-    this.alpha = Math.random();
-    this.size = Math.random()*1.8+0.4;
-    this.speed = Math.random()*0.02+0.01;
-  }
-  update() {
-    this.x += (this.tx-this.x)*this.speed;
-    this.y += (this.ty-this.y)*this.speed;
-  }
-  draw(glow=false) {
-    ctx.shadowBlur = glow ? 14 : 0;
-    ctx.shadowColor = "rgba(255,180,255,0.8)";
-    ctx.fillStyle = `rgba(255,255,255,${this.alpha})`;
-    ctx.fillRect(this.x,this.y,this.size,this.size);
-    ctx.shadowBlur = 0;
-  }
+// Stars
+const STAR_COUNT = window.innerWidth < 768 ? 1200 : 3000;
+geometry = new THREE.BufferGeometry();
+const positions = new Float32Array(STAR_COUNT * 3);
+
+for (let i = 0; i < STAR_COUNT; i++) {
+  positions[i * 3] = (Math.random() - 0.5) * 1000;
+  positions[i * 3 + 1] = (Math.random() - 0.5) * 1000;
+  positions[i * 3 + 2] = (Math.random() - 0.5) * 1000;
 }
 
-for(let i=0;i<STAR_COUNT;i++) stars.push(new Star());
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-function drawNebula() {
-  const g = ctx.createRadialGradient(
-    canvas.width/2,canvas.height/2,100,
-    canvas.width/2,canvas.height/2,canvas.width
-  );
-  g.addColorStop(0,"rgba(120,60,160,0.25)");
-  g.addColorStop(0.5,"rgba(40,60,120,0.15)");
-  g.addColorStop(1,"rgba(0,0,0,0.5)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-}
+const material = new THREE.PointsMaterial({
+  color: 0xffffff,
+  size: 1.5,
+  transparent: true,
+  opacity: 0.8,
+  blending: THREE.AdditiveBlending
+});
 
-function drawConstellation() {
-  for(let i=0;i<stars.length;i+=18){
-    for(let j=i+1;j<i+6 && j<stars.length;j++){
-      const a=stars[i], b=stars[j];
-      const d=Math.hypot(a.x-b.x,a.y-b.y);
-      if(d<120){
-        ctx.strokeStyle=`rgba(255,255,255,${0.15-d/120})`;
-        ctx.beginPath();
-        ctx.moveTo(a.x,a.y);
-        ctx.lineTo(b.x,b.y);
-        ctx.stroke();
-      }
-    }
-  }
-}
+particles = new THREE.Points(geometry, material);
+scene.add(particles);
 
-function animate(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawNebula();
-
-  galaxyAngle+=0.0003;
-  ctx.save();
-  ctx.translate(canvas.width/2,canvas.height/2);
-  ctx.rotate(galaxyAngle);
-  ctx.translate(-canvas.width/2,-canvas.height/2);
-
-  drawConstellation();
-
-  stars.forEach(s=>{
-    s.update();
-    s.draw(activeMode!==null);
-  });
-
-  ctx.restore();
-
-  if(Date.now()-lastDetected>1500) resetSpace();
+function animate() {
   requestAnimationFrame(animate);
+  particles.rotation.y += 0.0004;
+  renderer.render(scene, camera);
 }
 animate();
 
-function resetSpace(){
-  if(activeMode!==null){
-    activeMode=null;
-    stars.forEach(s=>s.reset());
-  }
-}
-
-function textPoints(text, romantic=false){
-  const off=document.createElement("canvas");
-  off.width=canvas.width;
-  off.height=canvas.height;
-  const o=off.getContext("2d");
-
-  o.fillStyle="white";
-  o.textAlign="center";
-  o.font= romantic ? "bold 54px 'Great Vibes'" : "36px 'Playfair Display'";
-  wrap(o,text,off.width/2,off.height/2,off.width*0.75,romantic?64:44);
-
-  const img=o.getImageData(0,0,off.width,off.height);
-  let pts=[];
-  for(let y=0;y<img.height;y+=4){
-    for(let x=0;x<img.width;x+=4){
-      if(img.data[(y*img.width+x)*4+3]>150) pts.push({x,y});
-    }
-  }
-  return pts;
-}
-
-function heartPoints(){
-  heartbeat+=0.03;
-  const scale=1+Math.sin(heartbeat)*0.06;
-  const pts=[];
-  const cx=canvas.width/2, cy=canvas.height/2;
-  for(let t=0;t<Math.PI*2;t+=0.02){
-    const x=16*Math.pow(Math.sin(t),3);
-    const y=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t));
-    pts.push({x:cx+x*15*scale,y:cy+y*15*scale});
-  }
-  return pts;
-}
-
-function apply(pts){
-  stars.forEach((s,i)=>{
-    const p=pts[i%pts.length];
-    s.tx=p.x; s.ty=p.y;
-  });
-}
-
-function wrap(ctx,text,x,y,max,line){
-  const w=text.split(" ");
-  let l="",arr=[];
-  for(let i=0;i<w.length;i++){
-    const t=l+w[i]+" ";
-    if(ctx.measureText(t).width>max){arr.push(l);l=w[i]+" ";}
-    else l=t;
-  }
-  arr.push(l);
-  arr.forEach((v,i)=>ctx.fillText(v,x,y+i*line));
-}
-
-const actions={
-1:()=>apply(textPoints(`Dear Laily Aliyah,
-I want to sincerely apologize for the situation that happened.
-I’m truly sorry if everything made you feel disappointed, confused, or hurt.
-What hurts me the most is knowing that you thought I was lying,
-even though I was being honest from the beginning.`)),
-2:()=>apply(textPoints(`I never intended to deceive you or break your trust in any way.
-I understand why you might have felt that way, and I respect your feelings.
-Still, I hope one day you can believe that my words were genuine
-and came from a sincere place.`)),
-3:()=>apply(textPoints(`I’m really sorry for the misunderstanding,
-and I truly hope we can clear things up
-and move forward with honesty and respect.`)),
-4:()=>apply(heartPoints()),
-5:()=>apply(textPoints(`ilysm ly ♥`,true)),
-fist:()=>apply(textPoints(`from: Raja Iblis`,true))
-};
-
-const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-hands.setOptions({maxNumHands:1,minDetectionConfidence:0.7,minTrackingConfidence:0.7});
-hands.onResults(r=>{
-  if(!r.multiHandLandmarks) return;
-  lastDetected=Date.now();
-  const lm=r.multiHandLandmarks[0];
-  const f=[
-    lm[4].x<lm[3].x,
-    lm[8].y<lm[6].y,
-    lm[12].y<lm[10].y,
-    lm[16].y<lm[14].y,
-    lm[20].y<lm[18].y
-  ];
-  const c=f.filter(v=>v).length;
-  if(c===0){actions.fist();activeMode="fist";}
-  else if(actions[c]&&activeMode!==c){actions[c]();activeMode=c;}
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-new Camera(video,{onFrame:async()=>await hands.send({image:video}),width:640,height:480}).start();
+/* =====================
+   PARTICLE MORPH TEXT
+===================== */
+function morphToText(text) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = 800;
+  canvas.height = 300;
+
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.font = 'italic 42px Playfair Display';
+  ctx.fillStyle = 'white';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const lines = text.split('\n');
+  lines.forEach((line, i) => {
+    ctx.fillText(line, canvas.width/2, canvas.height/2 + i*48);
+  });
+
+  const img = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const target = geometry.attributes.position.array;
+
+  let ptr = 0;
+  for (let y=0; y<canvas.height; y+=4) {
+    for (let x=0; x<canvas.width; x+=4) {
+      const index = (y * canvas.width + x) * 4;
+      if (img[index] > 10 && ptr < STAR_COUNT) {
+        target[ptr*3]   = x - canvas.width/2;
+        target[ptr*3+1] = canvas.height/2 - y;
+        target[ptr*3+2] = 0;
+        ptr++;
+      }
+    }
+  }
+  geometry.attributes.position.needsUpdate = true;
+}
+
+function resetGalaxy() {
+  const arr = geometry.attributes.position.array;
+  for (let i = 0; i < STAR_COUNT; i++) {
+    arr[i*3]   = (Math.random() - 0.5) * 1000;
+    arr[i*3+1] = (Math.random() - 0.5) * 1000;
+    arr[i*3+2] = (Math.random() - 0.5) * 1000;
+  }
+  geometry.attributes.position.needsUpdate = true;
+}
+
+/* =====================
+   HAND TRACKING
+===================== */
+let lastGesture = null;
+let lastTime = 0;
+
+const video = document.getElementById('video');
+const statusText = document.getElementById('gestureStatus');
+
+const hands = new Hands({
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 0,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.6,
+  selfieMode: true
+});
+
+hands.onResults(results => {
+  if (!results.multiHandLandmarks) {
+    statusText.textContent = 'Detecting...';
+    resetGalaxy();
+    lastGesture = null;
+    return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+  const fingers =
+    (lm[8].y < lm[6].y) +
+    (lm[12].y < lm[10].y) +
+    (lm[16].y < lm[14].y) +
+    (lm[20].y < lm[18].y);
+
+  let gesture = 'fist';
+  if (fingers === 1) gesture = 'one';
+  if (fingers === 2) gesture = 'two';
+  if (fingers === 3) gesture = 'three';
+  if (fingers === 4) gesture = 'four';
+  if (fingers === 5) gesture = 'five';
+
+  const now = Date.now();
+  if (gesture !== lastGesture && now - lastTime > 800) {
+    lastGesture = gesture;
+    lastTime = now;
+    triggerGesture(gesture);
+  }
+
+  statusText.textContent = 'Detected: ' + gesture;
+});
+
+function triggerGesture(g) {
+  if (g === 'one') {
+    morphToText(`Dear Laily Aliyah,\n\nI want to sincerely apologize for the situation that happened. I’m truly sorry if everything made you feel disappointed, confused, or hurt. What hurts me the most is knowing that you thought I was lying, even though I was being honest from the beginning.`);
+  }
+  if (g === 'two') {
+    morphToText(`I never intended to deceive you or break your trust in any way. I understand why you might have felt that way, and I respect your feelings. Still, I hope one day you can believe that my words were genuine and came from a sincere place.`);
+  }
+  if (g === 'three') {
+    morphToText(`I’m really sorry for the misunderstanding, and I truly hope we can clear things up and move forward with honesty and respect.`);
+  }
+  if (g === 'five') {
+    morphToText(`ilysm ly ♥`);
+  }
+  if (g === 'fist') {
+    morphToText(`from: Raja Iblis`);
+  }
+}
+
+/* =====================
+   START EXPERIENCE
+===================== */
+document.getElementById('startBtn').onclick = async () => {
+  document.getElementById('startOverlay').style.display = 'none';
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'user', width: 640, height: 480 }
+  });
+  video.srcObject = stream;
+  await video.play();
+
+  const cam = new Camera(video, {
+    onFrame: async () => {
+      await hands.send({ image: video });
+    },
+    width: 640,
+    height: 480
+  });
+  cam.start();
+
+  document.getElementById('bgm').play();
+};
 </script>
 </body>
 </html>
