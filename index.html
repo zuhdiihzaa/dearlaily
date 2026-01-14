@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>For Laily</title>
 
-<!-- Font romantis -->
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&display=swap" rel="stylesheet">
 
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
@@ -21,13 +19,11 @@ html,body{
   font-family:'Playfair Display',serif;
 }
 
-/* ===== SPACE ===== */
 canvas#space{
   position:fixed;
   inset:0;
 }
 
-/* ===== TEXT ===== */
 #text3d{
   position:fixed;
   inset:0;
@@ -47,7 +43,6 @@ canvas#space{
   pointer-events:none;
 }
 
-/* ===== CAMERA POV ===== */
 #pov{
   position:fixed;
   right:10px;
@@ -58,9 +53,9 @@ canvas#space{
   overflow:hidden;
   border:1px solid rgba(255,255,255,.2);
   opacity:.75;
+  transform:scaleX(-1); /* 🔥 FIX MIRROR */
 }
 
-/* ===== HALO ===== */
 #gestureHalo{
   position:fixed;
   width:140px;
@@ -74,13 +69,13 @@ canvas#space{
   animation:breath 3.5s ease-in-out infinite;
   transition:opacity .5s ease, transform .6s ease;
 }
+
 @keyframes breath{
   0%{transform:translate(-50%,-50%) scale(.9)}
   50%{transform:translate(-50%,-50%) scale(1.05)}
   100%{transform:translate(-50%,-50%) scale(.9)}
 }
 
-/* ===== PARTICLES ===== */
 #haloParticles{
   position:fixed;
   inset:0;
@@ -99,7 +94,7 @@ canvas#space{
 <canvas id="haloParticles"></canvas>
 
 <script>
-/* ================= SPACE ================= */
+/* ===== SPACE ===== */
 const sc=document.getElementById("space");
 const s=sc.getContext("2d");
 sc.width=innerWidth; sc.height=innerHeight;
@@ -111,7 +106,7 @@ let stars=[...Array(400)].map(()=>({
   c:`hsl(${200+Math.random()*100},80%,${60+Math.random()*20}%)`
 }));
 
-function drawSpace(){
+(function space(){
   s.clearRect(0,0,sc.width,sc.height);
   stars.forEach(st=>{
     st.y+=0.02+st.z*0.4;
@@ -119,11 +114,10 @@ function drawSpace(){
     s.fillStyle=st.c;
     s.fillRect(st.x,st.y,1+st.z*2,1+st.z*2);
   });
-  requestAnimationFrame(drawSpace);
-}
-drawSpace();
+  requestAnimationFrame(space);
+})();
 
-/* ================= TEXT ================= */
+/* ===== TEXT ===== */
 const textEl=document.getElementById("text3d");
 function showText(t){
   textEl.innerHTML=t.replace(/\n/g,"<br>");
@@ -135,7 +129,7 @@ function hideText(){
   textEl.style.transform="scale(.9)";
 }
 
-/* ================= HALO ================= */
+/* ===== HALO ===== */
 const halo=document.getElementById("gestureHalo");
 const haloColors=[
  "radial-gradient(circle,rgba(200,230,255,.6),rgba(180,140,255,.35),transparent 70%)",
@@ -144,6 +138,7 @@ const haloColors=[
  "radial-gradient(circle,rgba(255,150,200,.7),rgba(255,80,140,.45),transparent 70%)",
  "radial-gradient(circle,rgba(200,200,200,.6),rgba(150,150,255,.35),transparent 70%)"
 ];
+
 function showHalo(x,y,g){
   halo.style.left=x+"px";
   halo.style.top=y+"px";
@@ -156,16 +151,18 @@ function hideHalo(){
   halo.style.transform="translate(-50%,-50%) scale(.7)";
 }
 
-/* ================= PARTICLES ================= */
+/* ===== PARTICLES ===== */
 const pc=document.getElementById("haloParticles");
 const px=pc.getContext("2d");
 pc.width=innerWidth; pc.height=innerHeight;
 let particles=[];
+
 function emit(x,y){
   for(let i=0;i<2;i++)
     particles.push({x,y,vx:(Math.random()-.5)*.3,vy:-Math.random()*.6,l:80});
 }
-(function anim(){
+
+(function particleLoop(){
   px.clearRect(0,0,pc.width,pc.height);
   particles=particles.filter(p=>p.l>0);
   particles.forEach(p=>{
@@ -173,10 +170,10 @@ function emit(x,y){
     px.fillStyle=`rgba(255,255,255,${p.l/100})`;
     px.beginPath(); px.arc(p.x,p.y,1.5,0,Math.PI*2); px.fill();
   });
-  requestAnimationFrame(anim);
+  requestAnimationFrame(particleLoop);
 })();
 
-/* ================= HAND TRACK ================= */
+/* ===== CAMERA ===== */
 const video=document.getElementById("pov");
 navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}})
 .then(s=>video.srcObject=s);
@@ -184,15 +181,28 @@ navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}})
 const hands=new Hands({
   locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
-hands.setOptions({maxNumHands:1,minDetectionConfidence:.7,minTrackingConfidence:.7});
+hands.setOptions({
+  maxNumHands:1,
+  minDetectionConfidence:.6,
+  minTrackingConfidence:.6
+});
 
 let current=-1,hold=0;
 
 hands.onResults(r=>{
-  if(!r.multiHandLandmarks){ hideHalo(); hideText(); current=-1; return;}
+  if(!r.multiHandLandmarks){
+    hideHalo(); hideText(); current=-1; return;
+  }
+
   const lm=r.multiHandLandmarks[0];
-  const open=(t,p)=>lm[t].y<lm[p].y;
-  const i=open(8,6), m=open(12,10), r2=open(16,14), p=open(20,18);
+
+  /* 🔥 FIX UTAMA: LOGIKA DIBALIK */
+  const open=(t,p)=> lm[t].y > lm[p].y;
+
+  const i=open(8,6),
+        m=open(12,10),
+        r2=open(16,14),
+        p=open(20,18);
 
   let g=-1;
   if(i&&m&&r2&&p) g=0;
@@ -201,10 +211,12 @@ hands.onResults(r=>{
   else if(i&&!m&&!r2&&p) g=3;
   else if(!i&&!m&&!r2&&!p) g=4;
 
+  if(g===-1){
+    hideHalo(); hideText(); current=-1; return;
+  }
+
   const x=lm[9].x*innerWidth;
   const y=lm[9].y*innerHeight;
-
-  if(g===-1){ hideHalo(); hideText(); current=-1; return;}
 
   showHalo(x,y,g);
   emit(x,y);
@@ -222,7 +234,10 @@ hands.onResults(r=>{
   }
 });
 
-const cam=new Camera(video,{onFrame:async()=>hands.send({image:video}),width:480,height:640});
+const cam=new Camera(video,{
+  onFrame:async()=>hands.send({image:video}),
+  width:480,height:640
+});
 cam.start();
 </script>
 
