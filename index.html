@@ -12,7 +12,6 @@ html,body{
   overflow:hidden;
 }
 canvas{position:fixed;top:0;left:0}
-
 video{
   position:fixed;
   bottom:12px;
@@ -30,7 +29,7 @@ video{
 <video id="cam" autoplay playsinline></video>
 
 <script>
-/* ================= BASIC SETUP ================= */
+/* ================= SETUP ================= */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 function resize(){
@@ -39,58 +38,59 @@ function resize(){
 }
 resize(); addEventListener("resize",resize);
 
-/* ================= CAMERA (HAND ONLY) ================= */
+/* ================= CAMERA ================= */
 const video=document.getElementById("cam");
 navigator.mediaDevices.getUserMedia({video:true})
 .then(s=>video.srcObject=s);
 
-/* ================= STAR PARTICLES ================= */
-const STAR_COUNT = 1200;
+/* ================= STARS ================= */
+const STAR_COUNT = 900;
 const stars=[];
 for(let i=0;i<STAR_COUNT;i++){
   stars.push({
     x:Math.random()*canvas.width,
     y:Math.random()*canvas.height,
-    z:Math.random()*1,
+    z:Math.random(),
     tx:null, ty:null,
-    a:Math.random()*Math.PI*2
+    vx:(Math.random()-.5)*0.3,
+    vy:(Math.random()-.5)*0.3
   });
 }
 
 /* ================= DRAW ================= */
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
   stars.forEach(s=>{
-    s.a+=0.002;
     if(s.tx!==null){
-      s.x += (s.tx-s.x)*0.08;
-      s.y += (s.ty-s.y)*0.08;
+      s.x += (s.tx-s.x)*0.06;
+      s.y += (s.ty-s.y)*0.06;
     }else{
-      s.x += Math.cos(s.a)*0.15;
-      s.y += Math.sin(s.a)*0.15;
+      s.x+=s.vx;
+      s.y+=s.vy;
     }
+    if(s.x<0||s.x>canvas.width) s.vx*=-1;
+    if(s.y<0||s.y>canvas.height) s.vy*=-1;
 
-    const size = 1.2 + s.z*1.8;
+    const size = 1.2 + s.z*1.6;
     ctx.fillStyle=`rgba(180,220,255,0.85)`;
     ctx.beginPath();
     ctx.arc(s.x,s.y,size,0,Math.PI*2);
     ctx.fill();
   });
-
   requestAnimationFrame(draw);
 }
 draw();
 
-/* ================= TEXT TO STARS ================= */
+/* ================= TEXT MORPH ================= */
 function textToStars(text){
   const off=document.createElement("canvas");
   const octx=off.getContext("2d");
   off.width=canvas.width;
   off.height=canvas.height;
 
+  octx.clearRect(0,0,off.width,off.height);
   octx.fillStyle="white";
-  octx.font=`bold ${Math.min(canvas.width/14,64)}px Georgia`;
+  octx.font=`bold ${Math.min(canvas.width/15,52)}px Georgia`;
   octx.textAlign="center";
   octx.textBaseline="middle";
 
@@ -101,8 +101,8 @@ function textToStars(text){
 
   const img=octx.getImageData(0,0,off.width,off.height).data;
   const pts=[];
-  for(let y=0;y<off.height;y+=6){
-    for(let x=0;x<off.width;x+=6){
+  for(let y=0;y<off.height;y+=7){
+    for(let x=0;x<off.width;x+=7){
       if(img[(y*off.width+x)*4]>200){
         pts.push({x,y});
       }
@@ -125,24 +125,26 @@ function releaseStars(){
 }
 
 /* ================= MESSAGES ================= */
-const MESSAGE_OPEN =
+const MSG_OPEN =
 `Dear Laily Aliyah,
 I want to sincerely apologize for the situation that happened.
 I was honest from the beginning,
 and my words came from a sincere place.`;
 
-const MESSAGE_FIST =
-`ilysm ly ♥
+const MSG_FIST =
+`I’m really sorry for the misunderstanding.
+ilysm ly ♥
 from: Raja Iblis`;
 
-/* ================= HAND DETECTION (NO FACE) ================= */
+/* ================= HAND DETECTION ================= */
 const off=document.createElement("canvas");
 const offCtx=off.getContext("2d");
 off.width=160; off.height=120;
 
 let last=null;
 let stable=0;
-let mode="idle";
+let currentMode="idle";
+let cooldown=false;
 
 setInterval(()=>{
   if(video.videoWidth===0)return;
@@ -150,22 +152,24 @@ setInterval(()=>{
   const d=offCtx.getImageData(0,0,off.width,off.height).data;
 
   if(last){
-    let diff=0, bright=0;
+    let diff=0;
     for(let i=0;i<d.length;i+=4){
       diff+=Math.abs(d[i]-last[i]);
-      bright+=d[i];
     }
 
-    if(diff>260000){
+    if(diff>220000){
       stable++;
-      if(stable>6){
-        if(bright/ (d.length/4) > 110 && mode!=="open"){
-          mode="open";
-          textToStars(MESSAGE_OPEN);
-        }
-        if(bright/ (d.length/4) <=110 && mode!=="fist"){
-          mode="fist";
-          textToStars(MESSAGE_FIST);
+      if(stable>6 && !cooldown){
+        let mode = diff > 360000 ? "open" : "fist";
+
+        if(mode!==currentMode){
+          currentMode=mode;
+          cooldown=true;
+
+          if(mode==="open") textToStars(MSG_OPEN);
+          if(mode==="fist") textToStars(MSG_FIST);
+
+          setTimeout(()=>cooldown=false,1500);
         }
       }
     }else{
