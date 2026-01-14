@@ -1,53 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
-<title>Dear Laily – Cinematic Galaxy</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Dear Laily — Cinematic Space</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Great+Vibes&display=swap" rel="stylesheet">
 
 <style>
 html,body{
-  margin:0;height:100%;overflow:hidden;
-  background:#000;font-family:'Playfair Display',serif;
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
+  font-family:'Playfair Display',serif;
 }
 #start{
-  position:fixed;inset:0;display:flex;
-  align-items:center;justify-content:center;
-  color:#fff;font-size:22px;z-index:10;
-  background:#000;cursor:pointer;
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#000;
+  color:#fff;
+  font-size:22px;
+  letter-spacing:1px;
+  z-index:10;
+  cursor:pointer;
 }
 #indicator{
-  position:fixed;bottom:18px;left:50%;
+  position:fixed;
+  bottom:18px;
+  left:50%;
   transform:translateX(-50%);
-  color:#fff;font-size:14px;
-  opacity:0;transition:opacity .4s;
-  z-index:5;pointer-events:none;
+  color:#fff;
+  font-size:14px;
+  opacity:0;
+  transition:opacity .4s;
+  z-index:5;
 }
 #status{
-  position:fixed;top:14px;left:14px;
-  font-size:12px;color:#fff;
-  padding:6px 10px;border-radius:6px;
-  background:rgba(0,0,0,.4);
+  position:fixed;
+  top:14px;
+  left:14px;
+  padding:6px 10px;
+  font-size:12px;
+  color:#fff;
+  background:rgba(0,0,0,.45);
   backdrop-filter:blur(6px);
+  border-radius:6px;
   z-index:5;
 }
 #camBox{
-  position:fixed;right:10px;bottom:10px;
-  width:130px;height:180px;
+  position:fixed;
+  right:10px;
+  bottom:10px;
+  width:140px;
+  height:190px;
   border:1px solid rgba(255,255,255,.4);
-  border-radius:10px;overflow:hidden;
-  display:none;z-index:4;
+  border-radius:10px;
+  overflow:hidden;
+  display:none;
+  z-index:4;
 }
 #camBox video{
-  width:100%;height:100%;
-  object-fit:cover;transform:scaleX(-1);
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transform:scaleX(-1);
 }
 #camBox span{
-  position:absolute;bottom:6px;left:0;right:0;
-  text-align:center;font-size:10px;
-  color:#fff;opacity:.7;
+  position:absolute;
+  bottom:6px;
+  left:0;
+  right:0;
+  text-align:center;
+  font-size:10px;
+  color:#fff;
+  opacity:.7;
 }
 canvas{display:block}
 </style>
@@ -80,50 +111,54 @@ const camBox=document.getElementById('camBox')
 const video=document.getElementById('cam')
 const music=document.getElementById('music')
 
-/* ================= THREE ================= */
+/* ================= THREE SCENE ================= */
 const scene=new THREE.Scene()
-scene.fog=new THREE.FogExp2(0x070014,0.002)
+scene.fog=new THREE.FogExp2(0x060018,0.0018)
 
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,1200)
-camera.position.z=140
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1500)
+camera.position.z=160
 
 const renderer=new THREE.WebGLRenderer({antialias:true})
 renderer.setSize(innerWidth,innerHeight)
 renderer.setPixelRatio(Math.min(devicePixelRatio,2))
 document.body.appendChild(renderer.domElement)
 
-/* ================= PARTICLES ================= */
-const COUNT=16000
+/* ================= STAR PARTICLES ================= */
+const COUNT=20000
 const pos=new Float32Array(COUNT*3)
-const galaxy=new Float32Array(COUNT*3)
+const base=new Float32Array(COUNT*3)
 const target=new Float32Array(COUNT*3)
-const speed=new Float32Array(COUNT)
+const twinkle=new Float32Array(COUNT)
 
 for(let i=0;i<COUNT;i++){
-  const arm=i%4
-  const r=Math.random()*90
-  const a=Math.random()*Math.PI*2+arm
-  galaxy[i*3]=Math.cos(a)*r
-  galaxy[i*3+1]=(Math.random()-.5)*40
-  galaxy[i*3+2]=Math.sin(a)*r
-  pos.set(galaxy.slice(i*3,i*3+3),i*3)
-  target.set(galaxy.slice(i*3,i*3+3),i*3)
-  speed[i]=Math.random()*.6+.4
+  const r=Math.random()*400
+  const theta=Math.random()*Math.PI*2
+  const phi=Math.acos((Math.random()*2)-1)
+
+  base[i*3]=r*Math.sin(phi)*Math.cos(theta)
+  base[i*3+1]=r*Math.cos(phi)
+  base[i*3+2]=r*Math.sin(phi)*Math.sin(theta)
+
+  pos.set(base.slice(i*3,i*3+3),i*3)
+  target.set(base.slice(i*3,i*3+3),i*3)
+
+  twinkle[i]=Math.random()*Math.PI*2
 }
 
 const geo=new THREE.BufferGeometry()
 geo.setAttribute('position',new THREE.BufferAttribute(pos,3))
 
 const mat=new THREE.PointsMaterial({
-  color:0xd9e9ff,
-  size:1.3,
+  color:0xcfe9ff,
+  size:1.6,
   transparent:true,
-  opacity:.9,
+  opacity:0.85,
+  blending:THREE.AdditiveBlending,
   depthWrite:false
 })
 
-const points=new THREE.Points(geo,mat)
-scene.add(points)
+const stars=new THREE.Points(geo,mat)
+scene.add(stars)
 
 /* ================= STATE ================= */
 const STATE={IDLE:0,TRANSITION:1,DISPLAY:2}
@@ -137,22 +172,22 @@ function buildText(text){
   const chars=[...text]
   for(let i=0;i<COUNT;i++){
     const c=i%chars.length
-    target[i*3]=(c-chars.length/2)*2.4
-    target[i*3+1]=Math.sin(i*.15)*5
-    target[i*3+2]=(Math.floor(i/chars.length)%14-7)*2.2
+    target[i*3]=(c-chars.length/2)*2.5
+    target[i*3+1]=Math.sin(i*.12)*5
+    target[i*3+2]=(Math.floor(i/chars.length)%16-8)*2.5
   }
 }
 function buildHeart(){
   for(let i=0;i<COUNT;i++){
     const t=Math.random()*Math.PI*2
-    const r=20*(1-Math.sin(t))
+    const r=26*(1-Math.sin(t))
     target[i*3]=r*Math.cos(t)
     target[i*3+1]=r*Math.sin(t)
-    target[i*3+2]=(Math.random()-.5)*8
+    target[i*3+2]=(Math.random()-.5)*10
   }
 }
 function toGalaxy(){
-  target.set(galaxy)
+  target.set(base)
   morphT=0
   state=STATE.TRANSITION
   activeGesture=null
@@ -194,71 +229,71 @@ function pushGesture(g){
   return null
 }
 
-/* ================= CAMERA + AUTO RETRY ================= */
-let retryTimer=null
-async function initCamera(){
+/* ================= CAMERA ================= */
+let mediaStream=null,hands=null,cam=null
+async function requestCamera(){
   statusEl.textContent="CAMERA: REQUESTING"
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false})
-    video.srcObject=stream
+    mediaStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},
+      audio:false
+    })
+    video.srcObject=mediaStream
+    await video.play()
     statusEl.textContent="CAMERA: LIVE"
     camBox.style.display='block'
     startHands()
   }catch(e){
     statusEl.textContent="CAMERA: DENIED"
-    retryTimer=setTimeout(initCamera,3000)
+    setTimeout(requestCamera,3000)
   }
 }
-
 function startHands(){
-  const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`})
+  hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`})
   hands.setOptions({maxNumHands:1,minDetectionConfidence:.6,minTrackingConfidence:.6})
-
-  hands.onResults(res=>{
-    if(!res.multiHandLandmarks){
-      if(state===STATE.DISPLAY)toGalaxy()
-      return
-    }
-    const lm=res.multiHandLandmarks[0]
-    const tips=[4,8,12,16,20]
-    let fingers=0
-    for(let i=1;i<tips.length;i++){
-      if(lm[tips[i]].y<lm[tips[i]-2].y)fingers++
-    }
-    if(fingers===0)fingers="fist"
-    const valid=pushGesture(fingers)
-    if(valid!==null && valid!==activeGesture)applyGesture(valid)
-  })
-
-  const cam=new Camera(video,{
-    onFrame:async()=>{await hands.send({image:video})},
+  hands.onResults(onHands)
+  cam=new Camera(video,{
+    onFrame:async()=>{ if(video.readyState>=2) await hands.send({image:video}) },
     width:640,height:480
   })
   cam.start()
+}
+function onHands(res){
+  if(!res.multiHandLandmarks){
+    if(state===STATE.DISPLAY)toGalaxy()
+    return
+  }
+  const lm=res.multiHandLandmarks[0]
+  const tips=[4,8,12,16,20]
+  let fingers=0
+  for(let i=1;i<tips.length;i++){
+    if(lm[tips[i]].y<lm[tips[i]-2].y)fingers++
+  }
+  if(fingers===0)fingers="fist"
+  const valid=pushGesture(fingers)
+  if(valid!==null && valid!==activeGesture)applyGesture(valid)
 }
 
 /* ================= START ================= */
 start.onclick=async()=>{
   start.style.display='none'
   try{await music.play();music.volume=.35}catch(e){}
-  initCamera()
+  requestCamera()
 }
 
 /* ================= ANIMATE ================= */
-let mouseX=0,mouseY=0
+let mx=0,my=0
 window.onmousemove=e=>{
-  mouseX=(e.clientX/innerWidth-.5)*2
-  mouseY=(e.clientY/innerHeight-.5)*2
+  mx=(e.clientX/innerWidth-.5)*2
+  my=(e.clientY/innerHeight-.5)*2
 }
 
 function animate(t){
   requestAnimationFrame(animate)
 
   for(let i=0;i<COUNT;i++){
-    const idx=i*3
-    const a=t*0.00015*speed[i]
-    galaxy[idx]+=Math.sin(a+i)*0.002
-    galaxy[idx+2]+=Math.cos(a+i)*0.002
+    twinkle[i]+=0.01
+    mat.opacity=0.75+0.1*Math.sin(twinkle[i])
   }
 
   morphT=Math.min(morphT+1/60/morphDur,1)
@@ -268,10 +303,10 @@ function animate(t){
   }
   geo.attributes.position.needsUpdate=true
 
-  points.scale.setScalar(1+.02*Math.sin(t*.002))
-  points.rotation.y+=.00035
-  camera.position.x+=(mouseX*12-camera.position.x)*.04
-  camera.position.y+=(-mouseY*12-camera.position.y)*.04
+  stars.rotation.y+=0.00025
+  stars.rotation.x+=0.0001
+  camera.position.x+=(mx*25-camera.position.x)*.04
+  camera.position.y+=(-my*25-camera.position.y)*.04
 
   renderer.render(scene,camera)
 }
