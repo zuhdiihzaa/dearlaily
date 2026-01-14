@@ -103,27 +103,44 @@ hands.setOptions({
 const debug = document.getElementById("debug");
 
 hands.onResults(results => {
-  if (!results.multiHandLandmarks) {
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
     debug.textContent = "gesture: none";
     return;
   }
 
   const lm = results.multiHandLandmarks[0];
 
-  const tips = [8, 12, 16, 20];
-  let fingers = 0;
+  // Landmark index
+  const THUMB_TIP = 4;
+  const THUMB_IP  = 3;
+  const FINGER_TIPS = [8, 12, 16, 20];
+  const FINGER_PIPS = [6, 10, 14, 18];
 
-  tips.forEach(i => {
-    if (lm[i].y < lm[i - 2].y) fingers++;
-  });
+  let fingersUp = 0;
+
+  // ===== THUMB (mirror-safe horizontal check) =====
+  if (lm[THUMB_TIP].x > lm[THUMB_IP].x) {
+    fingersUp++;
+  }
+
+  // ===== OTHER FINGERS (vertical check) =====
+  for (let i = 0; i < FINGER_TIPS.length; i++) {
+    if (lm[FINGER_TIPS[i]].y < lm[FINGER_PIPS[i]].y) {
+      fingersUp++;
+    }
+  }
 
   let gesture = "unknown";
-  if (fingers === 1) gesture = "1 finger";
-  else if (fingers === 2) gesture = "2 fingers";
-  else if (fingers === 0) gesture = "fist";
+  if (fingersUp === 0) gesture = "fist";
+  else if (fingersUp === 1) gesture = "1 finger";
+  else if (fingersUp === 2) gesture = "2 fingers";
+  else if (fingersUp === 3) gesture = "3 fingers";
+  else if (fingersUp === 4) gesture = "4 fingers";
+  else if (fingersUp === 5) gesture = "5 fingers";
 
   debug.textContent = "gesture: " + gesture;
 });
+
 
 /* =========================
    CAMERA UTILS LOOP
