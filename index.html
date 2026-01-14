@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Idle Space – Safe Mode</title>
+<title>Idle Space – Phase 1 SAFE</title>
 
 <style>
 html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: black;
+  background: radial-gradient(circle at bottom, #050014 0%, #000 70%);
 }
 canvas { display: block; }
 #debug {
@@ -26,13 +26,43 @@ canvas { display: block; }
 </head>
 
 <body>
-<div id="debug">loading…</div>
+<div id="debug">init…</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 const debug = document.getElementById("debug");
 
-/* SCENE */
+/* =========================
+   CREATE STAR TEXTURE (CANVAS)
+========================= */
+function createStarTexture() {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  const gradient = ctx.createRadialGradient(
+    size/2, size/2, 0,
+    size/2, size/2, size/2
+  );
+  gradient.addColorStop(0, "rgba(255,255,255,1)");
+  gradient.addColorStop(0.2, "rgba(255,255,255,0.8)");
+  gradient.addColorStop(0.5, "rgba(180,200,255,0.3)");
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+const starTexture = createStarTexture();
+debug.textContent = "texture ok";
+
+/* =========================
+   SCENE
+========================= */
 const scene = new THREE.Scene();
 
 /* CAMERA */
@@ -50,52 +80,70 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 document.body.appendChild(renderer.domElement);
 
-/* STAR TEXTURE */
-const loader = new THREE.TextureLoader();
-loader.load(
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAZlBMVEUAAAD///////////////////////////////////////////////+np6f///+YmJjMzMzLy8v5+fnBwcHb29vV1dXp6enExMTq6urS0tKwsLCcnJzk5OTAwMDu7u7CwsKgoKCJiYlpaWnFxcUdHR1ubm6+vr6dnZ3Hx8dTU1P8/Pw6JSOQAAAAHnRSTlMAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYG9eK4QAAAJVJREFUGNNVjUcSgCAMBEMb3f9/d7cRQXKaL8tNykK7l+JmJg0vE1q0cKpYRhg+YBY2zZowIsfF9C0EMXYJ3Q7oFaDFmKo0kY9z0m1N6OpE8m5tI4wO8w1E1M2i2o7z4GxUjM9J9RHTZ4eKp6RcoZs/BRn+zZL8P4kAAAAASUVORK5CYII=',
-  (texture) => {
-    debug.textContent = "texture loaded";
+/* =========================
+   STAR FIELD
+========================= */
+const COUNT = 1500;
+const geometry = new THREE.BufferGeometry();
+const positions = new Float32Array(COUNT * 3);
+const colors = new Float32Array(COUNT * 3);
 
-    const count = 1200;
-    const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(count * 3);
+for (let i = 0; i < COUNT; i++) {
+  const i3 = i * 3;
+  const r = Math.random() * 600;
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.acos((Math.random() * 2) - 1);
 
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      pos[i3]     = (Math.random() - 0.5) * 600;
-      pos[i3 + 1] = (Math.random() - 0.5) * 600;
-      pos[i3 + 2] = (Math.random() - 0.5) * 600;
-    }
+  positions[i3]     = r * Math.sin(phi) * Math.cos(theta);
+  positions[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+  positions[i3 + 2] = r * Math.cos(phi);
 
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  let color;
+  const c = Math.random();
+  if (c < 0.5) color = new THREE.Color(0x9bb0ff);
+  else if (c < 0.8) color = new THREE.Color(0xffe4b5);
+  else color = new THREE.Color(0xffb6c1);
 
-    const mat = new THREE.PointsMaterial({
-      size: 2.2,
-      map: texture,
-      transparent: true,
-      opacity: 0.9,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
+  colors[i3] = color.r;
+  colors[i3+1] = color.g;
+  colors[i3+2] = color.b;
+}
 
-    const stars = new THREE.Points(geo, mat);
-    scene.add(stars);
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
-    function animate() {
-      requestAnimationFrame(animate);
-      stars.rotation.y += 0.0005;
-      renderer.render(scene, camera);
-    }
+const material = new THREE.PointsMaterial({
+  size: 2.4,
+  map: starTexture,
+  transparent: true,
+  opacity: 0.9,
+  vertexColors: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
 
-    animate();
-  },
-  undefined,
-  (err) => {
-    debug.textContent = "texture load error";
-    console.error(err);
-  }
-);
+const stars = new THREE.Points(geometry, material);
+scene.add(stars);
+
+/* =========================
+   ANIMATION
+========================= */
+debug.textContent = "rendering";
+
+function animate() {
+  requestAnimationFrame(animate);
+  stars.rotation.y += 0.00025;
+  stars.rotation.x += 0.00008;
+  renderer.render(scene, camera);
+}
+animate();
+
+/* RESIZE */
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 </script>
 </body>
 </html>
