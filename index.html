@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>For Laily</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 
 <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:wght@500&display=swap" rel="stylesheet">
 
@@ -21,8 +21,9 @@ canvas{ position:fixed; inset:0 }
 #start{
   position:fixed;
   inset:0;
-  background:radial-gradient(circle at center,#140028,#000);
+  background:radial-gradient(circle at center,#1a0033,#000);
   display:flex;
+  flex-direction:column;
   align-items:center;
   justify-content:center;
   color:white;
@@ -31,29 +32,36 @@ canvas{ position:fixed; inset:0 }
   z-index:20;
 }
 
-#camera{
+#start small{
+  margin-top:16px;
+  font-size:11px;
+  opacity:0.6;
+}
+
+#cameraBox{
   position:fixed;
-  right:12px;
-  bottom:12px;
-  width:130px;
-  height:180px;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  width:120px;
+  height:160px;
   border-radius:14px;
   overflow:hidden;
-  border:1px solid rgba(255,255,255,.4);
+  border:1px solid rgba(255,255,255,0.4);
   backdrop-filter:blur(6px);
   display:none;
   z-index:10;
 }
 
-#camera::after{
-  content:"place your hand here";
+#cameraBox::after{
+  content:"let your hand rest here";
   position:absolute;
   bottom:4px;
   width:100%;
   text-align:center;
   font-size:9px;
   color:white;
-  opacity:.7;
+  opacity:0.7;
 }
 
 video{
@@ -69,8 +77,12 @@ audio{display:none}
 
 <body>
 
-<div id="start">TOUCH TO BEGIN</div>
-<div id="camera"><video id="video" autoplay muted playsinline></video></div>
+<div id="start">
+  TOUCH TO BEGIN
+  <small id="noCam">Continue without camera</small>
+</div>
+
+<div id="cameraBox"><video id="video" autoplay muted playsinline></video></div>
 
 <audio id="music" loop>
   <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_4b06c6a2c3.mp3">
@@ -82,10 +94,10 @@ audio{display:none}
 
 <script>
 /* =====================
-   THREE SCENE
+   SCENE
 ===================== */
 const scene=new THREE.Scene();
-const cam3d=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,4000);
+const cam3d=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,1,4000);
 cam3d.position.z=900;
 
 const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
@@ -94,147 +106,135 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 document.body.appendChild(renderer.domElement);
 
 /* Stars */
-const starsGeo=new THREE.BufferGeometry();
-const count=3500;
-const arr=[];
-for(let i=0;i<count;i++){
-  arr.push(
-    (Math.random()-0.5)*3000,
+const starCount=2600;
+const geo=new THREE.BufferGeometry();
+const pos=[];
+for(let i=0;i<starCount;i++){
+  pos.push(
     (Math.random()-0.5)*2000,
-    (Math.random()-0.5)*3000
+    (Math.random()-0.5)*3000,
+    (Math.random()-0.5)*2000
   );
 }
-starsGeo.setAttribute("position",new THREE.Float32BufferAttribute(arr,3));
-const stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({
+geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+const stars=new THREE.Points(geo,new THREE.PointsMaterial({
   color:0xffffff,
   size:2,
   transparent:true,
   opacity:0.6
 }));
 scene.add(stars);
-
-/* Light */
 scene.add(new THREE.AmbientLight(0x7755ff,0.6));
-const glow=new THREE.PointLight(0xaa88ff,1.2,2500);
-glow.position.set(0,0,500);
-scene.add(glow);
 
 /* =====================
-   TEXT PARTICLES
+   TEXT WORD BY WORD
 ===================== */
-let message=null;
-function showMessage(text){
-  if(message) scene.remove(message);
+let mesh=null,interval=null;
+function showTextSlow(text){
+  if(mesh) scene.remove(mesh);
+  clearInterval(interval);
 
+  const words=text.split(" ");
+  let current=[];
+
+  interval=setInterval(()=>{
+    if(current.length>=words.length){
+      clearInterval(interval);
+      return;
+    }
+    current.push(words[current.length]);
+    drawText(current.join(" "));
+  },700);
+}
+
+function drawText(txt){
+  if(mesh) scene.remove(mesh);
   const c=document.createElement("canvas");
-  c.width=1800; c.height=500;
+  c.width=1000;c.height=900;
   const ctx=c.getContext("2d");
   ctx.fillStyle="white";
   ctx.textAlign="center";
-  ctx.font="70px Great Vibes";
+  ctx.font="60px Great Vibes";
 
-  const words=text.split(" ");
-  let line="";
-  let y=200;
-  for(let i=0;i<words.length;i++){
-    if((line+words[i]).length>35){
+  let y=220,line="";
+  txt.split(" ").forEach(w=>{
+    if((line+w).length>18){
       ctx.fillText(line,c.width/2,y);
-      line=""; y+=90;
+      line="";y+=90;
     }
-    line+=words[i]+" ";
-  }
+    line+=w+" ";
+  });
   ctx.fillText(line,c.width/2,y);
 
   const data=ctx.getImageData(0,0,c.width,c.height).data;
-  const geo=new THREE.BufferGeometry();
-  const pos=[];
+  const g=new THREE.BufferGeometry();
+  const p=[];
   for(let y2=0;y2<c.height;y2+=4){
     for(let x=0;x<c.width;x+=4){
       const i=(y2*c.width+x)*4;
       if(data[i+3]>150){
-        pos.push(
-          (x-c.width/2)*0.8,
-          (c.height/2-y2)*0.8,
-          0
-        );
+        p.push((x-c.width/2)*1.2,(c.height/2-y2)*1.2,0);
       }
     }
   }
-  geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
-  message=new THREE.Points(geo,new THREE.PointsMaterial({
-    color:0xffffff,
-    size:2,
-    transparent:true,
-    opacity:1
-  }));
-  scene.add(message);
+  g.setAttribute("position",new THREE.Float32BufferAttribute(p,3));
+  mesh=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:2,transparent:true,opacity:1}));
+  scene.add(mesh);
 }
 
 /* =====================
-   GESTURE MAP
+   SEQUENCE (NO CAMERA)
 ===================== */
-const texts={
-  1:"Dear Laily Aliyah, I want to sincerely apologize for everything that happened.",
-  2:"I never intended to deceive you or break your trust. My words were honest.",
-  3:"I’m truly sorry for the misunderstanding and the pain it caused.",
-  4:"♥",
-  5:"ilysm ly ♥",
-  0:"from: Raja Iblis"
-};
+const sequence=[
+  "Dear Laily Aliyah, I want to sincerely apologize for everything that happened.",
+  "I never intended to deceive you or break your trust.",
+  "I am truly sorry for the misunderstanding and the pain it caused.",
+  "ilysm ly ♥",
+  "from: Raja Iblis"
+];
 
-let last=-1,hold=0;
+function playSequence(){
+  let i=0;
+  const next=()=>{
+    if(i>=sequence.length)return;
+    showTextSlow(sequence[i]);
+    i++;
+    setTimeout(next,6000);
+  };
+  next();
+}
 
 /* =====================
-   MEDIAPIPE
+   CAMERA MODE
 ===================== */
 const hands=new Hands({
   locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
-hands.setOptions({
-  maxNumHands:1,
-  modelComplexity:1,
-  minDetectionConfidence:0.7,
-  minTrackingConfidence:0.7
-});
+hands.setOptions({maxNumHands:1,minDetectionConfidence:.65,minTrackingConfidence:.65});
 
 hands.onResults(r=>{
-  if(!r.multiHandLandmarks.length){
-    if(message){
-      message.material.opacity*=0.97;
-      if(message.material.opacity<0.05){
-        scene.remove(message);
-        message=null;
-      }
-    }
-    last=-1;
-    return;
-  }
-
-  const lm=r.multiHandLandmarks[0];
-  const tips=[4,8,12,16,20];
-  let c=0;
-  for(let i=1;i<5;i++) if(lm[tips[i]].y<lm[tips[i]-2].y)c++;
-  if(lm[4].x<lm[3].x)c++;
-
-  if(c!==last){hold=0;last=c;return;}
-  hold++;
-  if(hold>18 && texts[c]) showMessage(texts[c]);
+  if(!r.multiHandLandmarks.length)return;
+  showTextSlow(sequence[0]);
 });
 
 /* =====================
    START
 ===================== */
 const video=document.getElementById("video");
-const cam=new Camera(video,{
-  onFrame:async()=>hands.send({image:video}),
-  width:640,height:480
-});
+const cam=new Camera(video,{onFrame:async()=>hands.send({image:video}),width:640,height:480});
 
 document.getElementById("start").onclick=()=>{
   document.getElementById("start").remove();
-  document.getElementById("camera").style.display="block";
+  document.getElementById("cameraBox").style.display="block";
   document.getElementById("music").play();
   cam.start();
+};
+
+document.getElementById("noCam").onclick=e=>{
+  e.stopPropagation();
+  document.getElementById("start").remove();
+  document.getElementById("music").play();
+  playSequence();
 };
 
 /* =====================
@@ -242,8 +242,7 @@ document.getElementById("start").onclick=()=>{
 ===================== */
 function animate(){
   requestAnimationFrame(animate);
-  stars.rotation.y+=0.0004;
-  cam3d.position.x=Math.sin(Date.now()*0.00008)*20;
+  stars.rotation.y+=0.0002;
   renderer.render(scene,cam3d);
 }
 animate();
@@ -254,5 +253,6 @@ addEventListener("resize",()=>{
   renderer.setSize(innerWidth,innerHeight);
 });
 </script>
+
 </body>
 </html>
