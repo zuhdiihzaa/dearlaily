@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>For Laily</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 
-<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:wght@500&display=swap" rel="stylesheet">
+<!-- Font romantis -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&display=swap" rel="stylesheet">
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <style>
 html,body{
@@ -16,242 +21,209 @@ html,body{
   font-family:'Playfair Display',serif;
 }
 
-canvas{ position:fixed; inset:0 }
-
-#start{
+/* ===== SPACE ===== */
+canvas#space{
   position:fixed;
   inset:0;
-  background:radial-gradient(circle at center,#1a0033,#000);
+}
+
+/* ===== TEXT ===== */
+#text3d{
+  position:fixed;
+  inset:0;
   display:flex;
-  flex-direction:column;
   align-items:center;
   justify-content:center;
-  color:white;
-  font-size:16px;
-  letter-spacing:2px;
-  z-index:20;
+  padding:24px;
+  text-align:center;
+  font-size:clamp(18px,4.5vw,28px);
+  color:#fff;
+  text-shadow:
+    0 0 12px rgba(255,255,255,.6),
+    0 0 30px rgba(160,120,255,.4);
+  opacity:0;
+  transform:scale(.9);
+  transition:opacity 1.2s ease, transform 1.2s ease;
+  pointer-events:none;
 }
 
-#start small{
-  margin-top:16px;
-  font-size:11px;
-  opacity:0.6;
-}
-
-#cameraBox{
+/* ===== CAMERA POV ===== */
+#pov{
   position:fixed;
-  top:10px;
-  left:50%;
-  transform:translateX(-50%);
+  right:10px;
+  bottom:10px;
   width:120px;
   height:160px;
   border-radius:14px;
   overflow:hidden;
-  border:1px solid rgba(255,255,255,0.4);
-  backdrop-filter:blur(6px);
-  display:none;
-  z-index:10;
+  border:1px solid rgba(255,255,255,.2);
+  opacity:.75;
 }
 
-#cameraBox::after{
-  content:"let your hand rest here";
-  position:absolute;
-  bottom:4px;
-  width:100%;
-  text-align:center;
-  font-size:9px;
-  color:white;
-  opacity:0.7;
+/* ===== HALO ===== */
+#gestureHalo{
+  position:fixed;
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  pointer-events:none;
+  opacity:0;
+  transform:translate(-50%,-50%) scale(.7);
+  filter:blur(8px);
+  mix-blend-mode:screen;
+  animation:breath 3.5s ease-in-out infinite;
+  transition:opacity .5s ease, transform .6s ease;
+}
+@keyframes breath{
+  0%{transform:translate(-50%,-50%) scale(.9)}
+  50%{transform:translate(-50%,-50%) scale(1.05)}
+  100%{transform:translate(-50%,-50%) scale(.9)}
 }
 
-video{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  transform:scaleX(-1);
+/* ===== PARTICLES ===== */
+#haloParticles{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
 }
-
-audio{display:none}
 </style>
 </head>
 
 <body>
 
-<div id="start">
-  TOUCH TO BEGIN
-  <small id="noCam">Continue without camera</small>
-</div>
+<canvas id="space"></canvas>
+<div id="text3d"></div>
 
-<div id="cameraBox"><video id="video" autoplay muted playsinline></video></div>
-
-<audio id="music" loop>
-  <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_4b06c6a2c3.mp3">
-</audio>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<video id="pov" autoplay playsinline muted></video>
+<div id="gestureHalo"></div>
+<canvas id="haloParticles"></canvas>
 
 <script>
-/* =====================
-   SCENE
-===================== */
-const scene=new THREE.Scene();
-const cam3d=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,1,4000);
-cam3d.position.z=900;
+/* ================= SPACE ================= */
+const sc=document.getElementById("space");
+const s=sc.getContext("2d");
+sc.width=innerWidth; sc.height=innerHeight;
 
-const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-document.body.appendChild(renderer.domElement);
-
-/* Stars */
-const starCount=2600;
-const geo=new THREE.BufferGeometry();
-const pos=[];
-for(let i=0;i<starCount;i++){
-  pos.push(
-    (Math.random()-0.5)*2000,
-    (Math.random()-0.5)*3000,
-    (Math.random()-0.5)*2000
-  );
-}
-geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
-const stars=new THREE.Points(geo,new THREE.PointsMaterial({
-  color:0xffffff,
-  size:2,
-  transparent:true,
-  opacity:0.6
+let stars=[...Array(400)].map(()=>({
+  x:Math.random()*sc.width,
+  y:Math.random()*sc.height,
+  z:Math.random(),
+  c:`hsl(${200+Math.random()*100},80%,${60+Math.random()*20}%)`
 }));
-scene.add(stars);
-scene.add(new THREE.AmbientLight(0x7755ff,0.6));
 
-/* =====================
-   TEXT WORD BY WORD
-===================== */
-let mesh=null,interval=null;
-function showTextSlow(text){
-  if(mesh) scene.remove(mesh);
-  clearInterval(interval);
-
-  const words=text.split(" ");
-  let current=[];
-
-  interval=setInterval(()=>{
-    if(current.length>=words.length){
-      clearInterval(interval);
-      return;
-    }
-    current.push(words[current.length]);
-    drawText(current.join(" "));
-  },700);
-}
-
-function drawText(txt){
-  if(mesh) scene.remove(mesh);
-  const c=document.createElement("canvas");
-  c.width=1000;c.height=900;
-  const ctx=c.getContext("2d");
-  ctx.fillStyle="white";
-  ctx.textAlign="center";
-  ctx.font="60px Great Vibes";
-
-  let y=220,line="";
-  txt.split(" ").forEach(w=>{
-    if((line+w).length>18){
-      ctx.fillText(line,c.width/2,y);
-      line="";y+=90;
-    }
-    line+=w+" ";
+function drawSpace(){
+  s.clearRect(0,0,sc.width,sc.height);
+  stars.forEach(st=>{
+    st.y+=0.02+st.z*0.4;
+    if(st.y>sc.height) st.y=0;
+    s.fillStyle=st.c;
+    s.fillRect(st.x,st.y,1+st.z*2,1+st.z*2);
   });
-  ctx.fillText(line,c.width/2,y);
+  requestAnimationFrame(drawSpace);
+}
+drawSpace();
 
-  const data=ctx.getImageData(0,0,c.width,c.height).data;
-  const g=new THREE.BufferGeometry();
-  const p=[];
-  for(let y2=0;y2<c.height;y2+=4){
-    for(let x=0;x<c.width;x+=4){
-      const i=(y2*c.width+x)*4;
-      if(data[i+3]>150){
-        p.push((x-c.width/2)*1.2,(c.height/2-y2)*1.2,0);
-      }
-    }
-  }
-  g.setAttribute("position",new THREE.Float32BufferAttribute(p,3));
-  mesh=new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:2,transparent:true,opacity:1}));
-  scene.add(mesh);
+/* ================= TEXT ================= */
+const textEl=document.getElementById("text3d");
+function showText(t){
+  textEl.innerHTML=t.replace(/\n/g,"<br>");
+  textEl.style.opacity=1;
+  textEl.style.transform="scale(1)";
+}
+function hideText(){
+  textEl.style.opacity=0;
+  textEl.style.transform="scale(.9)";
 }
 
-/* =====================
-   SEQUENCE (NO CAMERA)
-===================== */
-const sequence=[
-  "Dear Laily Aliyah, I want to sincerely apologize for everything that happened.",
-  "I never intended to deceive you or break your trust.",
-  "I am truly sorry for the misunderstanding and the pain it caused.",
-  "ilysm ly ♥",
-  "from: Raja Iblis"
+/* ================= HALO ================= */
+const halo=document.getElementById("gestureHalo");
+const haloColors=[
+ "radial-gradient(circle,rgba(200,230,255,.6),rgba(180,140,255,.35),transparent 70%)",
+ "radial-gradient(circle,rgba(255,230,200,.6),rgba(255,170,120,.35),transparent 70%)",
+ "radial-gradient(circle,rgba(200,255,230,.6),rgba(120,255,200,.35),transparent 70%)",
+ "radial-gradient(circle,rgba(255,150,200,.7),rgba(255,80,140,.45),transparent 70%)",
+ "radial-gradient(circle,rgba(200,200,200,.6),rgba(150,150,255,.35),transparent 70%)"
 ];
-
-function playSequence(){
-  let i=0;
-  const next=()=>{
-    if(i>=sequence.length)return;
-    showTextSlow(sequence[i]);
-    i++;
-    setTimeout(next,6000);
-  };
-  next();
+function showHalo(x,y,g){
+  halo.style.left=x+"px";
+  halo.style.top=y+"px";
+  halo.style.background=haloColors[g];
+  halo.style.opacity=1;
+  halo.style.transform="translate(-50%,-50%) scale(1)";
+}
+function hideHalo(){
+  halo.style.opacity=0;
+  halo.style.transform="translate(-50%,-50%) scale(.7)";
 }
 
-/* =====================
-   CAMERA MODE
-===================== */
+/* ================= PARTICLES ================= */
+const pc=document.getElementById("haloParticles");
+const px=pc.getContext("2d");
+pc.width=innerWidth; pc.height=innerHeight;
+let particles=[];
+function emit(x,y){
+  for(let i=0;i<2;i++)
+    particles.push({x,y,vx:(Math.random()-.5)*.3,vy:-Math.random()*.6,l:80});
+}
+(function anim(){
+  px.clearRect(0,0,pc.width,pc.height);
+  particles=particles.filter(p=>p.l>0);
+  particles.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.l--;
+    px.fillStyle=`rgba(255,255,255,${p.l/100})`;
+    px.beginPath(); px.arc(p.x,p.y,1.5,0,Math.PI*2); px.fill();
+  });
+  requestAnimationFrame(anim);
+})();
+
+/* ================= HAND TRACK ================= */
+const video=document.getElementById("pov");
+navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}})
+.then(s=>video.srcObject=s);
+
 const hands=new Hands({
   locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
-hands.setOptions({maxNumHands:1,minDetectionConfidence:.65,minTrackingConfidence:.65});
+hands.setOptions({maxNumHands:1,minDetectionConfidence:.7,minTrackingConfidence:.7});
+
+let current=-1,hold=0;
 
 hands.onResults(r=>{
-  if(!r.multiHandLandmarks.length)return;
-  showTextSlow(sequence[0]);
+  if(!r.multiHandLandmarks){ hideHalo(); hideText(); current=-1; return;}
+  const lm=r.multiHandLandmarks[0];
+  const open=(t,p)=>lm[t].y<lm[p].y;
+  const i=open(8,6), m=open(12,10), r2=open(16,14), p=open(20,18);
+
+  let g=-1;
+  if(i&&m&&r2&&p) g=0;
+  else if(i&&m&&!r2&&!p) g=1;
+  else if(i&&!m&&!r2&&!p) g=2;
+  else if(i&&!m&&!r2&&p) g=3;
+  else if(!i&&!m&&!r2&&!p) g=4;
+
+  const x=lm[9].x*innerWidth;
+  const y=lm[9].y*innerHeight;
+
+  if(g===-1){ hideHalo(); hideText(); current=-1; return;}
+
+  showHalo(x,y,g);
+  emit(x,y);
+
+  if(g!==current){ current=g; hold=0; return;}
+  hold++;
+  if(hold>18){
+    showText([
+      "Dear Laily Aliyah,<br><br>I want to sincerely apologize for everything that happened.",
+      "I never intended to deceive you or break your trust. My words were honest.",
+      "I am truly sorry for the misunderstanding, and I hope we can move forward.",
+      "ilysm ly ♥",
+      "from: Raja Iblis"
+    ][g]);
+  }
 });
 
-/* =====================
-   START
-===================== */
-const video=document.getElementById("video");
-const cam=new Camera(video,{onFrame:async()=>hands.send({image:video}),width:640,height:480});
-
-document.getElementById("start").onclick=()=>{
-  document.getElementById("start").remove();
-  document.getElementById("cameraBox").style.display="block";
-  document.getElementById("music").play();
-  cam.start();
-};
-
-document.getElementById("noCam").onclick=e=>{
-  e.stopPropagation();
-  document.getElementById("start").remove();
-  document.getElementById("music").play();
-  playSequence();
-};
-
-/* =====================
-   LOOP
-===================== */
-function animate(){
-  requestAnimationFrame(animate);
-  stars.rotation.y+=0.0002;
-  renderer.render(scene,cam3d);
-}
-animate();
-
-addEventListener("resize",()=>{
-  cam3d.aspect=innerWidth/innerHeight;
-  cam3d.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
+const cam=new Camera(video,{onFrame:async()=>hands.send({image:video}),width:480,height:640});
+cam.start();
 </script>
 
 </body>
