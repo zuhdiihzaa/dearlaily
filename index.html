@@ -1,58 +1,134 @@
-<!-- (TRUNCATED HEADER & STYLE TETAP SAMA DENGAN FASE 4A) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Dear Laily</title>
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  background:black;
+  overflow:hidden;
+  font-family:serif;
+}
+#debug{
+  position:fixed;
+  bottom:10px;
+  left:10px;
+  color:#7aa2ff;
+  font-size:12px;
+  z-index:10;
+}
+#cameraBox{
+  position:fixed;
+  top:10px;
+  right:10px;
+  width:160px;
+  aspect-ratio:1/1;
+  border-radius:16px;
+  overflow:hidden;
+  border:2px dashed rgba(255,255,255,.4);
+  z-index:5;
+}
+video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+</style>
+</head>
+
+<body>
+<div id="cameraBox">
+  <video id="video" autoplay playsinline></video>
+</div>
+<div id="debug">gesture: idle</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+
 <script>
-/* =========================
-   TEXT TARGET FACTORY
-========================= */
-function generateTextTargets(text, scale = 0.26, maxWidth = 780) {
-  const c = document.createElement("canvas");
-  c.width = 1000;
-  c.height = 420;
-  const ctx = c.getContext("2d");
+/* ======================
+   BASIC THREE SETUP
+====================== */
+const scene=new THREE.Scene();
+const camera3D=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,0.1,1000);
+camera3D.position.z=60;
 
-  ctx.clearRect(0, 0, c.width, c.height);
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  ctx.font = "52px serif";
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.appendChild(renderer.domElement);
 
-  // word wrap
-  const words = text.split(" ");
-  let line = "";
-  const lines = [];
-  for (let w of words) {
-    const test = line + w + " ";
-    if (ctx.measureText(test).width > maxWidth) {
-      lines.push(line);
-      line = w + " ";
-    } else {
-      line = test;
-    }
+/* ======================
+   STARS
+====================== */
+const COUNT=2500;
+const geo=new THREE.BufferGeometry();
+const pos=new Float32Array(COUNT*3);
+const basePos=new Float32Array(COUNT*3);
+
+for(let i=0;i<COUNT;i++){
+  const i3=i*3;
+  pos[i3]=(Math.random()-0.5)*120;
+  pos[i3+1]=(Math.random()-0.5)*120;
+  pos[i3+2]=(Math.random()-0.5)*120;
+  basePos.set(pos.slice(i3,i3+3),i3);
+}
+
+geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
+
+const mat=new THREE.PointsMaterial({
+  color:0xffffff,
+  size:0.6,
+  sizeAttenuation:true
+});
+
+const stars=new THREE.Points(geo,mat);
+scene.add(stars);
+
+/* ======================
+   TEXT TARGET GENERATOR
+====================== */
+function generateTextTargets(text,scale=0.25){
+  const c=document.createElement("canvas");
+  c.width=1000; c.height=420;
+  const ctx=c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.fillStyle="white";
+  ctx.textAlign="center";
+  ctx.font="52px serif";
+
+  const words=text.split(" ");
+  let line="", lines=[];
+  for(let w of words){
+    if(ctx.measureText(line+w).width>760){
+      lines.push(line); line=w+" ";
+    }else line+=w+" ";
   }
   lines.push(line);
 
-  const startY = c.height / 2 - lines.length * 30;
-  lines.forEach((l, i) => {
-    ctx.fillText(l.trim(), c.width / 2, startY + i * 60);
+  const startY=c.height/2-lines.length*28;
+  lines.forEach((l,i)=>{
+    ctx.fillText(l.trim(),c.width/2,startY+i*56);
   });
 
-  const d = ctx.getImageData(0, 0, c.width, c.height).data;
-  const t = [];
-  for (let y = 0; y < c.height; y += 4) {
-    for (let x = 0; x < c.width; x += 4) {
-      if (d[(y * c.width + x) * 4 + 3] > 150) {
-        t.push({
-          x: (x - c.width / 2) * scale,
-          y: (c.height / 2 - y) * scale,
-          z: 0
-        });
+  const d=ctx.getImageData(0,0,c.width,c.height).data;
+  const t=[];
+  for(let y=0;y<c.height;y+=4){
+    for(let x=0;x<c.width;x+=4){
+      if(d[(y*c.width+x)*4+3]>150){
+        t.push({x:(x-c.width/2)*scale,y:(c.height/2-y)*scale,z:0});
       }
     }
   }
   return t;
 }
-/* =========================
-   HEART TARGET
-========================= */
-function generateHeartTargets() {
+
+function generateHeartTargets(){
   const t=[];
   for(let i=0;i<COUNT;i++){
     const a=Math.random()*Math.PI*2;
@@ -62,72 +138,116 @@ function generateHeartTargets() {
   return t;
 }
 
-/* =========================
+/* ======================
    TARGET MAP
-========================= */
-const TARGETS = {
-  "1 finger": generateTextTargets(
-`Dear Laily Aliyah,
-
-I want to sincerely apologize for the situation that happened.
-I’m truly sorry if everything made you feel disappointed,
-confused, or hurt.
-
-What hurts me the most is knowing that you thought I was lying,
-even though I was being honest from the beginning.`
+====================== */
+const TARGETS={
+  "1 finger":generateTextTargets(
+    "Dear Laily Aliyah I want to sincerely apologize for the situation that happened I’m truly sorry if everything made you feel disappointed confused or hurt What hurts me the most is knowing that you thought I was lying even though I was being honest from the beginning"
   ),
-
-  "2 fingers": generateTextTargets(
-`I never intended to deceive you or break your trust in any way.
-I understand why you might have felt that way,
-and I respect your feelings.
-
-Still, I hope one day you can believe
-that my words were genuine
-and came from a sincere place.`
+  "2 fingers":generateTextTargets(
+    "I never intended to deceive you or break your trust in any way I understand why you might have felt that way and I respect your feelings Still I hope one day you can believe that my words were genuine and came from a sincere place"
   ),
-
-  "3 fingers": generateTextTargets(
-`I’m really sorry for the misunderstanding,
-and I truly hope we can clear things up
-and move forward with honesty and respect.`
+  "3 fingers":generateTextTargets(
+    "I’m really sorry for the misunderstanding and I truly hope we can clear things up and move forward with honesty and respect"
   ),
-
-  "4 fingers": generateHeartTargets(),
-
-  "5 fingers": generateTextTargets(
-`ilysm ly ♥`
-  ),
-
-  "fist": generateTextTargets(
-`from: Raja Iblis`
-  )
+  "4 fingers":generateHeartTargets(),
+  "5 fingers":generateTextTargets("ilysm ly ♥",0.35),
+  "fist":generateTextTargets("from Raja Iblis",0.32)
 };
 
-let activeTargets=null;
+let stableGesture="none";
 
-/* =========================
-   MODIFY ANIMATE LOOP
-========================= */
-function animate() {
+/* ======================
+   MEDIAPIPE HANDS
+====================== */
+const video=document.getElementById("video");
+const debug=document.getElementById("debug");
+
+const hands=new Hands({
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+
+hands.setOptions({
+  maxNumHands:1,
+  modelComplexity:1,
+  minDetectionConfidence:0.7,
+  minTrackingConfidence:0.7
+});
+
+let lastGesture="none",startTime=0;
+const HOLD=700;
+
+hands.onResults(r=>{
+  if(!r.multiHandLandmarks){
+    stableGesture="none";
+    debug.textContent="gesture: idle";
+    return;
+  }
+
+  const lm=r.multiHandLandmarks[0];
+  const up=(t,p)=>lm[t].y<lm[p].y;
+
+  let count=0;
+  if(up(8,6))count++;
+  if(up(12,10))count++;
+  if(up(16,14))count++;
+  if(up(20,18))count++;
+
+  let g="unknown";
+  if(count===0)g="fist";
+  else if(count===1)g="1 finger";
+  else if(count===2)g="2 fingers";
+  else if(count===3)g="3 fingers";
+  else if(count===4)g="4 fingers";
+
+  const now=performance.now();
+  if(g!==lastGesture){
+    lastGesture=g;
+    startTime=now;
+  }else if(now-startTime>HOLD){
+    stableGesture=g;
+  }
+
+  debug.textContent="gesture: "+stableGesture;
+});
+
+new Camera(video,{
+  onFrame:async()=>{await hands.send({image:video});},
+  width:480,height:480
+}).start();
+
+/* ======================
+   ANIMATION LOOP
+====================== */
+function animate(){
   requestAnimationFrame(animate);
-
-  activeTargets = TARGETS[stableGesture] || null;
-
+  const target=TARGETS[stableGesture];
   const p=geo.attributes.position.array;
+
   for(let i=0;i<COUNT;i++){
     const i3=i*3;
     let tx,ty,tz;
-    if(activeTargets && i<activeTargets.length){
-      ({x:tx,y:ty,z:tz}=activeTargets[i]);
-    } else {
+    if(target && i<target.length){
+      ({x:tx,y:ty,z:tz}=target[i]);
+    }else{
       tx=basePos[i3]; ty=basePos[i3+1]; tz=basePos[i3+2];
     }
     p[i3]+= (tx-p[i3])*0.08;
     p[i3+1]+= (ty-p[i3+1])*0.08;
     p[i3+2]+= (tz-p[i3+2])*0.08;
   }
+
   geo.attributes.position.needsUpdate=true;
   renderer.render(scene,camera3D);
 }
+animate();
+
+window.addEventListener("resize",()=>{
+  camera3D.aspect=innerWidth/innerHeight;
+  camera3D.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
 </script>
+</body>
+</html>
