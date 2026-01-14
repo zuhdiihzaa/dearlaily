@@ -1,14 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>For Laily</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600&display=swap" rel="stylesheet">
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cosmic Touch</title>
 
 <style>
 html,body{
@@ -16,230 +11,140 @@ html,body{
   padding:0;
   background:black;
   overflow:hidden;
-  font-family:'Playfair Display',serif;
+  font-family: system-ui, sans-serif;
 }
-
-canvas#space{
+canvas{
   position:fixed;
-  inset:0;
+  top:0;left:0;
 }
-
-#text3d{
+#halo{
   position:fixed;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
-  text-align:center;
-  font-size:clamp(18px,4.5vw,28px);
-  color:#fff;
-  text-shadow:
-    0 0 12px rgba(255,255,255,.6),
-    0 0 30px rgba(160,120,255,.4);
-  opacity:0;
-  transform:scale(.9);
-  transition:opacity 1.2s ease, transform 1.2s ease;
-  pointer-events:none;
-}
-
-#pov{
-  position:fixed;
-  right:10px;
-  bottom:10px;
-  width:120px;
-  height:160px;
-  border-radius:14px;
-  overflow:hidden;
-  border:1px solid rgba(255,255,255,.2);
-  opacity:.75;
-  transform:scaleX(-1); /* 🔥 FIX MIRROR */
-}
-
-#gestureHalo{
-  position:fixed;
-  width:140px;
-  height:140px;
+  bottom:18%;
+  left:50%;
+  transform:translateX(-50%);
+  width:20px;height:20px;
   border-radius:50%;
-  pointer-events:none;
+  background:#4ff;
   opacity:0;
-  transform:translate(-50%,-50%) scale(.7);
-  filter:blur(8px);
-  mix-blend-mode:screen;
-  animation:breath 3.5s ease-in-out infinite;
-  transition:opacity .5s ease, transform .6s ease;
+  box-shadow:0 0 20px #4ff;
+  transition:.2s;
 }
-
-@keyframes breath{
-  0%{transform:translate(-50%,-50%) scale(.9)}
-  50%{transform:translate(-50%,-50%) scale(1.05)}
-  100%{transform:translate(-50%,-50%) scale(.9)}
-}
-
-#haloParticles{
+#text{
   position:fixed;
-  inset:0;
-  pointer-events:none;
+  top:45%;
+  width:100%;
+  text-align:center;
+  font-size:clamp(28px,7vw,60px);
+  color:white;
+  letter-spacing:3px;
+  opacity:0;
+}
+video{
+  position:fixed;
+  bottom:12px;
+  right:12px;
+  width:110px;
+  border-radius:12px;
+  opacity:.9;
 }
 </style>
 </head>
 
 <body>
+<canvas id="stars"></canvas>
+<div id="halo"></div>
+<div id="text">KAMU HADIR</div>
+<video id="cam" autoplay playsinline></video>
 
-<canvas id="space"></canvas>
-<div id="text3d"></div>
-
-<video id="pov" autoplay playsinline muted></video>
-<div id="gestureHalo"></div>
-<canvas id="haloParticles"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-/* ===== SPACE ===== */
-const sc=document.getElementById("space");
-const s=sc.getContext("2d");
-sc.width=innerWidth; sc.height=innerHeight;
+const canvas=document.getElementById("stars");
+const ctx=canvas.getContext("2d");
+const halo=document.getElementById("halo");
+const text=document.getElementById("text");
+canvas.width=innerWidth;
+canvas.height=innerHeight;
 
-let stars=[...Array(400)].map(()=>({
-  x:Math.random()*sc.width,
-  y:Math.random()*sc.height,
-  z:Math.random(),
-  c:`hsl(${200+Math.random()*100},80%,${60+Math.random()*20}%)`
+const stars=[...Array(300)].map(()=>({
+ x:Math.random()*canvas.width,
+ y:Math.random()*canvas.height,
+ r:Math.random()*1.5+0.5,
+ vx:(Math.random()-.5)*0.2,
+ vy:(Math.random()-.5)*0.2,
+ c:`hsl(${200+Math.random()*120},100%,70%)`
 }));
 
-(function space(){
-  s.clearRect(0,0,sc.width,sc.height);
-  stars.forEach(st=>{
-    st.y+=0.02+st.z*0.4;
-    if(st.y>sc.height) st.y=0;
-    s.fillStyle=st.c;
-    s.fillRect(st.x,st.y,1+st.z*2,1+st.z*2);
-  });
-  requestAnimationFrame(space);
-})();
-
-/* ===== TEXT ===== */
-const textEl=document.getElementById("text3d");
-function showText(t){
-  textEl.innerHTML=t.replace(/\n/g,"<br>");
-  textEl.style.opacity=1;
-  textEl.style.transform="scale(1)";
+let triggered=false;
+function animate(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ stars.forEach(s=>{
+  s.x+=s.vx; s.y+=s.vy;
+  if(s.x<0)s.x=canvas.width;
+  if(s.y<0)s.y=canvas.height;
+  ctx.fillStyle=s.c;
+  ctx.beginPath();
+  ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+  ctx.fill();
+ });
+ requestAnimationFrame(animate);
 }
-function hideText(){
-  textEl.style.opacity=0;
-  textEl.style.transform="scale(.9)";
-}
+animate();
 
-/* ===== HALO ===== */
-const halo=document.getElementById("gestureHalo");
-const haloColors=[
- "radial-gradient(circle,rgba(200,230,255,.6),rgba(180,140,255,.35),transparent 70%)",
- "radial-gradient(circle,rgba(255,230,200,.6),rgba(255,170,120,.35),transparent 70%)",
- "radial-gradient(circle,rgba(200,255,230,.6),rgba(120,255,200,.35),transparent 70%)",
- "radial-gradient(circle,rgba(255,150,200,.7),rgba(255,80,140,.45),transparent 70%)",
- "radial-gradient(circle,rgba(200,200,200,.6),rgba(150,150,255,.35),transparent 70%)"
-];
-
-function showHalo(x,y,g){
-  halo.style.left=x+"px";
-  halo.style.top=y+"px";
-  halo.style.background=haloColors[g];
-  halo.style.opacity=1;
-  halo.style.transform="translate(-50%,-50%) scale(1)";
-}
-function hideHalo(){
-  halo.style.opacity=0;
-  halo.style.transform="translate(-50%,-50%) scale(.7)";
-}
-
-/* ===== PARTICLES ===== */
-const pc=document.getElementById("haloParticles");
-const px=pc.getContext("2d");
-pc.width=innerWidth; pc.height=innerHeight;
-let particles=[];
-
-function emit(x,y){
-  for(let i=0;i<2;i++)
-    particles.push({x,y,vx:(Math.random()-.5)*.3,vy:-Math.random()*.6,l:80});
-}
-
-(function particleLoop(){
-  px.clearRect(0,0,pc.width,pc.height);
-  particles=particles.filter(p=>p.l>0);
-  particles.forEach(p=>{
-    p.x+=p.vx; p.y+=p.vy; p.l--;
-    px.fillStyle=`rgba(255,255,255,${p.l/100})`;
-    px.beginPath(); px.arc(p.x,p.y,1.5,0,Math.PI*2); px.fill();
-  });
-  requestAnimationFrame(particleLoop);
-})();
-
-/* ===== CAMERA ===== */
-const video=document.getElementById("pov");
-navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}})
-.then(s=>video.srcObject=s);
+// === HAND TRACKING ===
+const video=document.getElementById("cam");
+let stableFrames=0;
 
 const hands=new Hands({
-  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+ locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 hands.setOptions({
-  maxNumHands:1,
-  minDetectionConfidence:.6,
-  minTrackingConfidence:.6
+ maxNumHands:1,
+ modelComplexity:0,
+ minDetectionConfidence:0.6,
+ minTrackingConfidence:0.6
 });
 
-let current=-1,hold=0;
+hands.onResults(res=>{
+ if(!res.multiHandLandmarks) {
+   stableFrames=0;
+   halo.style.opacity=0;
+   return;
+ }
 
-hands.onResults(r=>{
-  if(!r.multiHandLandmarks){
-    hideHalo(); hideText(); current=-1; return;
-  }
+ const lm=res.multiHandLandmarks[0];
+ const fingers=[
+  lm[8].y<lm[6].y,
+  lm[12].y<lm[10].y,
+  lm[16].y<lm[14].y,
+  lm[20].y<lm[18].y
+ ];
+ const thumb=lm[4].x<lm[3].x;
+ const openHand=fingers.every(f=>f)&&thumb;
 
-  const lm=r.multiHandLandmarks[0];
-
-  /* 🔥 FIX UTAMA: LOGIKA DIBALIK */
-  const open=(t,p)=> lm[t].y > lm[p].y;
-
-  const i=open(8,6),
-        m=open(12,10),
-        r2=open(16,14),
-        p=open(20,18);
-
-  let g=-1;
-  if(i&&m&&r2&&p) g=0;
-  else if(i&&m&&!r2&&!p) g=1;
-  else if(i&&!m&&!r2&&!p) g=2;
-  else if(i&&!m&&!r2&&p) g=3;
-  else if(!i&&!m&&!r2&&!p) g=4;
-
-  if(g===-1){
-    hideHalo(); hideText(); current=-1; return;
-  }
-
-  const x=lm[9].x*innerWidth;
-  const y=lm[9].y*innerHeight;
-
-  showHalo(x,y,g);
-  emit(x,y);
-
-  if(g!==current){ current=g; hold=0; return;}
-  hold++;
-  if(hold>18){
-    showText([
-      "Dear Laily Aliyah,<br><br>I want to sincerely apologize for everything that happened.",
-      "I never intended to deceive you or break your trust. My words were honest.",
-      "I am truly sorry for the misunderstanding, and I hope we can move forward.",
-      "ilysm ly ♥",
-      "from: Raja Iblis"
-    ][g]);
-  }
+ if(openHand){
+   stableFrames++;
+   halo.style.opacity=1;
+   if(stableFrames>12 && !triggered){
+     triggered=true;
+     text.style.opacity=1;
+     stars.forEach(s=>{
+       s.vx=(canvas.width/2-s.x)/120;
+       s.vy=(canvas.height/2-s.y)/120;
+     });
+   }
+ }else{
+   stableFrames=0;
+   halo.style.opacity=0;
+ }
 });
 
-const cam=new Camera(video,{
-  onFrame:async()=>hands.send({image:video}),
-  width:480,height:640
+const camera=new Camera(video,{
+ onFrame:async()=>{await hands.send({image:video});},
+ width:640,height:480
 });
-cam.start();
+camera.start();
 </script>
-
 </body>
 </html>
