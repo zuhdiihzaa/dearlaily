@@ -13,7 +13,6 @@
 html,body{margin:0;padding:0;background:#000;overflow:hidden;font-family:'Playfair Display',serif;color:#fff}
 #container{position:fixed;inset:0}
 #gestureStatus{position:fixed;top:10px;left:50%;transform:translateX(-50%);font-size:13px;opacity:.8;z-index:5}
-
 #cameraBox{
  position:fixed;bottom:12px;right:12px;width:120px;height:160px;
  border-radius:14px;overflow:hidden;
@@ -23,7 +22,6 @@ html,body{margin:0;padding:0;background:#000;overflow:hidden;font-family:'Playfa
 }
 #cameraBox video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
 #cameraGuide{position:absolute;inset:14px;border:1px dashed rgba(255,255,255,.6);border-radius:10px}
-
 #startOverlay{
  position:fixed;inset:0;z-index:10;
  display:flex;align-items:center;justify-content:center;
@@ -61,189 +59,225 @@ html,body{margin:0;padding:0;background:#000;overflow:hidden;font-family:'Playfa
 </audio>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.2/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <script>
-/* ========= SCENE ========= */
-let scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x060010,0.0015);
+/* ================= SCENE ================= */
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x05000d,0.0014);
 
-let camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
-camera.position.z=420;
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
+camera.position.set(0,0,460);
 
-let renderer=new THREE.WebGLRenderer({antialias:false});
+const renderer=new THREE.WebGLRenderer({antialias:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 renderer.setSize(innerWidth,innerHeight);
-document.getElementById('container').appendChild(renderer.domElement);
+document.getElementById("container").appendChild(renderer.domElement);
 
-/* ========= NEBULA ========= */
-let nebulaGeo=new THREE.BufferGeometry();
-let nebulaCount=600;
-let nebulaPos=new Float32Array(nebulaCount*3);
+/* ================= NEBULA ================= */
+const nebulaGeo=new THREE.BufferGeometry();
+const nebulaCount=800;
+const nebulaPos=new Float32Array(nebulaCount*3);
 for(let i=0;i<nebulaCount;i++){
- nebulaPos[i*3]=(Math.random()-0.5)*2000;
- nebulaPos[i*3+1]=(Math.random()-0.5)*2000;
- nebulaPos[i*3+2]=(Math.random()-0.5)*2000;
+ nebulaPos[i*3]=(Math.random()-0.5)*2200;
+ nebulaPos[i*3+1]=(Math.random()-0.5)*2200;
+ nebulaPos[i*3+2]=(Math.random()-0.5)*2200;
 }
-nebulaGeo.setAttribute('position',new THREE.BufferAttribute(nebulaPos,3));
-let nebula=new THREE.Points(
+nebulaGeo.setAttribute("position",new THREE.BufferAttribute(nebulaPos,3));
+const nebula=new THREE.Points(
  nebulaGeo,
- new THREE.PointsMaterial({color:0x8833ff,size:8,opacity:.15,transparent:true})
+ new THREE.PointsMaterial({color:0xaa66ff,size:10,opacity:.18,transparent:true})
 );
 scene.add(nebula);
 
-/* ========= STARS ========= */
-const STAR_COUNT=innerWidth<768?1200:2600;
-let geo=new THREE.BufferGeometry();
-let pos=new Float32Array(STAR_COUNT*3);
-let target=new Float32Array(STAR_COUNT*3);
+/* ================= STARS ================= */
+const STAR_COUNT=innerWidth<768?1400:3000;
+const geo=new THREE.BufferGeometry();
+const pos=new Float32Array(STAR_COUNT*3);
+const target=new Float32Array(STAR_COUNT*3);
 
 for(let i=0;i<STAR_COUNT;i++){
- pos[i*3]=(Math.random()-0.5)*1200;
- pos[i*3+1]=(Math.random()-0.5)*1200;
- pos[i*3+2]=(Math.random()-0.5)*1200;
+ pos[i*3]=(Math.random()-0.5)*1600;
+ pos[i*3+1]=(Math.random()-0.5)*1600;
+ pos[i*3+2]=(Math.random()-0.5)*1600;
  target.set(pos);
 }
-geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
 
-let stars=new THREE.Points(
- geo,
- new THREE.PointsMaterial({
-  color:0xffffff,size:1.6,transparent:true,
-  blending:THREE.AdditiveBlending
- })
-);
+const material=new THREE.PointsMaterial({
+ size:1.9,transparent:true,opacity:0.95,
+ blending:THREE.AdditiveBlending,vertexColors:true
+});
+
+const colors=new Float32Array(STAR_COUNT*3);
+geo.setAttribute("color",new THREE.BufferAttribute(colors,3));
+
+const stars=new THREE.Points(geo,material);
 scene.add(stars);
 
-/* ========= ANIMATE ========= */
+/* ================= CAMERA MOVE ================= */
+let camTime=0;
+let cinematic=true;
+
+function updateCamera(){
+ if(!cinematic) return;
+ camTime+=0.002;
+ camera.position.x=Math.sin(camTime)*40;
+ camera.position.y=Math.cos(camTime*0.6)*25;
+ camera.lookAt(0,0,0);
+}
+
+/* ================= RENDER ================= */
 function animate(){
  requestAnimationFrame(animate);
- nebula.rotation.y+=0.0002;
- nebula.rotation.x+=0.0001;
+ nebula.rotation.y+=0.0003;
+ nebula.rotation.x+=0.0002;
+ updateCamera();
 
- let p=geo.attributes.position.array;
+ const p=geo.attributes.position.array;
  for(let i=0;i<STAR_COUNT*3;i++){
-  p[i]+= (target[i]-p[i]) * 0.05;
+  p[i]+= (target[i]-p[i]) * 0.045;
  }
  geo.attributes.position.needsUpdate=true;
  renderer.render(scene,camera);
 }
 animate();
 
-addEventListener('resize',()=>{
+addEventListener("resize",()=>{
  camera.aspect=innerWidth/innerHeight;
  camera.updateProjectionMatrix();
  renderer.setSize(innerWidth,innerHeight);
 });
 
-/* ========= TEXT / SHAPE ========= */
-function buildFromCanvas(draw){
- let c=document.createElement('canvas');
- let ctx=c.getContext('2d');
- let portrait=innerHeight>innerWidth;
- c.width=portrait?360:800;
- c.height=portrait?520:360;
+/* ================= COLOR THEMES ================= */
+const THEMES={
+ 1:[0.7,0.4,1.0],
+ 2:[0.4,0.8,1.0],
+ 3:[1.0,0.85,0.4],
+ 4:[1.0,0.4,0.7],
+ 5:[1.0,0.3,0.9],
+ fist:[0.95,0.95,1.0]
+};
+
+function applyColor(rgb){
+ for(let i=0;i<STAR_COUNT;i++){
+  colors[i*3]=rgb[0];
+  colors[i*3+1]=rgb[1];
+  colors[i*3+2]=rgb[2];
+ }
+ geo.attributes.color.needsUpdate=true;
+}
+
+/* ================= MORPH ================= */
+function morph(draw,depth=3){
+ const c=document.createElement("canvas");
+ const ctx=c.getContext("2d");
+ const portrait=innerHeight>innerWidth;
+ c.width=portrait?380:900;
+ c.height=portrait?560:420;
 
  ctx.fillStyle="#000";ctx.fillRect(0,0,c.width,c.height);
  draw(ctx,c);
 
- let img=ctx.getImageData(0,0,c.width,c.height).data;
+ const img=ctx.getImageData(0,0,c.width,c.height).data;
  let i=0;
- for(let y=0;y<c.height;y+=4){
-  for(let x=0;x<c.width;x+=4){
-   if(img[(y*c.width+x)*4]>10 && i<STAR_COUNT){
-    target[i*3]=x-c.width/2;
-    target[i*3+1]=c.height/2-y;
-    target[i*3+2]=0;
-    i++;
+ for(let z=0;z<depth;z++){
+  for(let y=0;y<c.height;y+=4){
+   for(let x=0;x<c.width;x+=4){
+    if(img[(y*c.width+x)*4]>10 && i<STAR_COUNT){
+     target[i*3]=x-c.width/2;
+     target[i*3+1]=c.height/2-y;
+     target[i*3+2]=(z-(depth/2))*14;
+     i++;
+    }
    }
   }
  }
+ cinematic=false;
 }
 
-function textMorph(text){
- buildFromCanvas((ctx,c)=>{
+/* ================= TEXT ================= */
+function textMorph(text,theme){
+ applyColor(THEMES[theme]);
+ morph((ctx,c)=>{
   ctx.fillStyle="#fff";
-  ctx.font=(innerHeight>innerWidth?24:30)+"px Playfair Display";
-  ctx.textAlign="center";ctx.textBaseline="top";
-  let lines=text.split("\n");
-  lines.forEach((l,i)=>ctx.fillText(l,c.width/2,40+i*40));
- });
+  ctx.textAlign="center";
+  ctx.textBaseline="top";
+  ctx.shadowColor="rgba(255,255,255,0.9)";
+  ctx.shadowBlur=28;
+  const size=innerHeight>innerWidth?26:34;
+  ctx.font=size+"px Playfair Display";
+  text.split("\n").forEach((l,i)=>ctx.fillText(l,c.width/2,40+i*(size+16)));
+ },3);
 }
 
+/* ================= HEART 3D ================= */
 function heartMorph(){
- buildFromCanvas((ctx,c)=>{
+ applyColor(THEMES[4]);
+ morph((ctx,c)=>{
   ctx.fillStyle="#fff";
+  ctx.shadowColor="rgba(255,120,180,0.9)";
+  ctx.shadowBlur=35;
   ctx.translate(c.width/2,c.height/2);
-  ctx.scale(1.3,1.3);
+  ctx.scale(1.5,1.5);
   ctx.beginPath();
   ctx.moveTo(0,40);
-  ctx.bezierCurveTo(-80,-40,-40,-120,0,-40);
-  ctx.bezierCurveTo(40,-120,80,-40,0,40);
+  ctx.bezierCurveTo(-90,-50,-50,-150,0,-60);
+  ctx.bezierCurveTo(50,-150,90,-50,0,40);
   ctx.fill();
- });
+ },7);
 }
 
+/* ================= RESET ================= */
 function resetGalaxy(){
+ cinematic=true;
  for(let i=0;i<STAR_COUNT;i++){
-  target[i*3]=(Math.random()-0.5)*1200;
-  target[i*3+1]=(Math.random()-0.5)*1200;
-  target[i*3+2]=(Math.random()-0.5)*1200;
+  target[i*3]=(Math.random()-0.5)*1600;
+  target[i*3+1]=(Math.random()-0.5)*1600;
+  target[i*3+2]=(Math.random()-0.5)*1600;
  }
 }
 
-/* ========= HAND TRACK ========= */
+/* ================= HAND TRACK ================= */
 const video=document.getElementById("video");
 const status=document.getElementById("gestureStatus");
 
-const hands=new Hands({
- locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
-
+const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
 hands.setOptions({
- maxNumHands:1,
- modelComplexity:0,
- selfieMode:true,
- minDetectionConfidence:.75,
- minTrackingConfidence:.7
+ maxNumHands:1,modelComplexity:0,selfieMode:true,
+ minDetectionConfidence:.78,minTrackingConfidence:.72
 });
 
 let last=null,lastT=0;
-
-function fingerExtended(tip,pip,mcp){
- return Math.atan2(tip.y-pip.y,tip.x-pip.x) <
-        Math.atan2(pip.y-mcp.y,pip.x-mcp.x);
-}
+function ext(t,p,m){return Math.atan2(t.y-p.y,t.x-p.x)<Math.atan2(p.y-m.y,p.x-m.x);}
 
 hands.onResults(r=>{
  if(!r.multiHandLandmarks){resetGalaxy();status.textContent="Detecting…";last=null;return;}
- let lm=r.multiHandLandmarks[0];
+ const lm=r.multiHandLandmarks[0];
  let f=0;
- if(fingerExtended(lm[8],lm[6],lm[5]))f++;
- if(fingerExtended(lm[12],lm[10],lm[9]))f++;
- if(fingerExtended(lm[16],lm[14],lm[13]))f++;
- if(fingerExtended(lm[20],lm[18],lm[17]))f++;
-
- let g=f===0?"fist":f;
- let now=Date.now();
- if(g!==last && now-lastT>900){
+ if(ext(lm[8],lm[6],lm[5]))f++;
+ if(ext(lm[12],lm[10],lm[9]))f++;
+ if(ext(lm[16],lm[14],lm[13]))f++;
+ if(ext(lm[20],lm[18],lm[17]))f++;
+ const g=f===0?"fist":f;
+ const now=Date.now();
+ if(g!==last && now-lastT>1000){
   last=g;lastT=now;
-  if(g===1)textMorph(`Dear Laily Aliyah,\n\nI want to sincerely apologize for the situation that happened.\nI’m truly sorry if everything made you feel disappointed,\nconfused, or hurt.\n\nWhat hurts me the most is knowing that you thought\nI was lying, even though I was honest from the beginning.`);
-  if(g===2)textMorph(`I never intended to deceive you or break your trust.\nI understand your feelings and respect them.\nI hope one day you can believe\nmy words came from a sincere place.`);
-  if(g===3)textMorph(`I’m really sorry for the misunderstanding.\nI hope we can clear things up\nand move forward with honesty and respect.`);
+  if(g===1)textMorph(`Dear Laily Aliyah,\n\nI want to sincerely apologize for the situation that happened.\nI’m truly sorry if everything made you feel disappointed,\nconfused, or hurt.\n\nWhat hurts me the most is knowing that you thought\nI was lying, even though I was honest from the beginning.`,1);
+  if(g===2)textMorph(`I never intended to deceive you or break your trust.\nI understand your feelings and respect them.\nI hope one day you can believe\nmy words came from a sincere place.`,2);
+  if(g===3)textMorph(`I’m really sorry for the misunderstanding.\nI hope we can clear things up\nand move forward with honesty and respect.`,3);
   if(g===4)heartMorph();
-  if(g===5)textMorph(`ilysm ly ♥`);
-  if(g==="fist")textMorph(`from:\nRaja Iblis`);
+  if(g===5)textMorph(`ilysm ly ♥`,5);
+  if(g==="fist")textMorph(`from:\nRaja Iblis`,"fist");
  }
  status.textContent="Detected: "+g;
 });
 
-/* ========= START ========= */
+/* ================= START ================= */
 document.getElementById("startBtn").onclick=async()=>{
  document.getElementById("startOverlay").style.display="none";
- let stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:640,height:480}});
+ const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:640,height:480}});
  video.srcObject=stream;await video.play();
  new Camera(video,{onFrame:()=>hands.send({image:video}),width:640,height:480}).start();
  document.getElementById("bgm").play();
