@@ -4,250 +4,175 @@
 <meta charset="UTF-8">
 <title>Cosmic Gesture Message</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@0;1&family=Great+Vibes&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap" rel="stylesheet">
 <style>
-html,body{margin:0;padding:0;background:#000;overflow:hidden;font-family:'Playfair Display',serif;color:#fff}
+html,body{margin:0;padding:0;background:#000;overflow:hidden;font-family:'Playfair Display',serif}
 #container{position:fixed;inset:0}
-#gestureStatus{position:fixed;top:10px;left:50%;transform:translateX(-50%);font-size:13px;opacity:.8;z-index:5}
-#cameraBox{
- position:fixed;bottom:12px;right:12px;width:120px;height:160px;
- border-radius:14px;overflow:hidden;
- border:2px solid rgba(255,255,255,.4);
- box-shadow:0 0 20px rgba(180,120,255,.8);
- z-index:5
-}
+#gestureStatus{position:fixed;top:10px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;opacity:.8;z-index:5}
+#cameraBox{position:fixed;bottom:12px;right:12px;width:120px;height:160px;border-radius:14px;overflow:hidden;border:2px solid rgba(255,255,255,.4);z-index:5}
 #cameraBox video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-#cameraGuide{position:absolute;inset:14px;border:1px dashed rgba(255,255,255,.6);border-radius:10px}
-#startOverlay{
- position:fixed;inset:0;z-index:10;
- display:flex;align-items:center;justify-content:center;
- background:radial-gradient(circle,#2a0055,#000);
- text-align:center
-}
-#startOverlay button{
- padding:16px 28px;border-radius:40px;border:none;
- background:linear-gradient(135deg,#ff9ad5,#9b7bff);
- font-size:18px;cursor:pointer;
- box-shadow:0 0 30px rgba(255,180,255,.6)
-}
+#startOverlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#220044,#000);color:#fff;text-align:center}
+#startOverlay button{padding:16px 28px;border-radius:40px;border:none;background:#fff;font-size:18px;cursor:pointer}
 </style>
 </head>
-
 <body>
+
 <div id="container"></div>
 <div id="gestureStatus">Detecting…</div>
 
 <div id="cameraBox">
  <video id="video" playsinline></video>
- <div id="cameraGuide"></div>
 </div>
 
 <div id="startOverlay">
  <div>
   <h2>✨ Tap to Start ✨</h2>
-  <p>Arahkan tangan ke tengah kamera</p>
   <button id="startBtn">Start</button>
  </div>
 </div>
-
-<audio id="bgm" loop>
- <source src="https://cdn.pixabay.com/audio/2022/03/15/audio_4c3c3a1f1a.mp3">
-</audio>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <script>
-/* ================= SCENE ================= */
+/* ================= CORE ================= */
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x05000d,0.0014);
+scene.fog=new THREE.FogExp2(0x050010,0.0012);
 
 const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
-camera.position.set(0,0,460);
+camera.position.z=500;
 
 const renderer=new THREE.WebGLRenderer({antialias:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 renderer.setSize(innerWidth,innerHeight);
 document.getElementById("container").appendChild(renderer.domElement);
 
-/* ================= NEBULA ================= */
-const nebulaGeo=new THREE.BufferGeometry();
-const nebulaCount=800;
-const nebulaPos=new Float32Array(nebulaCount*3);
-for(let i=0;i<nebulaCount;i++){
- nebulaPos[i*3]=(Math.random()-0.5)*2200;
- nebulaPos[i*3+1]=(Math.random()-0.5)*2200;
- nebulaPos[i*3+2]=(Math.random()-0.5)*2200;
-}
-nebulaGeo.setAttribute("position",new THREE.BufferAttribute(nebulaPos,3));
-const nebula=new THREE.Points(
- nebulaGeo,
- new THREE.PointsMaterial({color:0xaa66ff,size:10,opacity:.18,transparent:true})
-);
-scene.add(nebula);
-
 /* ================= STARS ================= */
-const STAR_COUNT=innerWidth<768?1400:3000;
+const COUNT=innerWidth<768?1500:3200;
 const geo=new THREE.BufferGeometry();
-const pos=new Float32Array(STAR_COUNT*3);
-const target=new Float32Array(STAR_COUNT*3);
+const pos=new Float32Array(COUNT*3);
+const galaxy=new Float32Array(COUNT*3);
+const shape=new Float32Array(COUNT*3);
 
-for(let i=0;i<STAR_COUNT;i++){
- pos[i*3]=(Math.random()-0.5)*1600;
- pos[i*3+1]=(Math.random()-0.5)*1600;
- pos[i*3+2]=(Math.random()-0.5)*1600;
- target.set(pos);
+for(let i=0;i<COUNT;i++){
+ galaxy[i*3]=(Math.random()-0.5)*1800;
+ galaxy[i*3+1]=(Math.random()-0.5)*1800;
+ galaxy[i*3+2]=(Math.random()-0.5)*1800;
+ pos.set(galaxy);
+ shape.set(galaxy);
 }
 geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
 
-const material=new THREE.PointsMaterial({
- size:1.9,transparent:true,opacity:0.95,
- blending:THREE.AdditiveBlending,vertexColors:true
-});
-
-const colors=new Float32Array(STAR_COUNT*3);
-geo.setAttribute("color",new THREE.BufferAttribute(colors,3));
-
-const stars=new THREE.Points(geo,material);
+const stars=new THREE.Points(
+ geo,
+ new THREE.PointsMaterial({
+  color:0xffffff,size:1.8,transparent:true,
+  opacity:0.9,blending:THREE.AdditiveBlending
+ })
+);
 scene.add(stars);
 
-/* ================= CAMERA MOVE ================= */
-let camTime=0;
-let cinematic=true;
+/* ================= BLEND ================= */
+let blend=0;          // 0 galaxy → 1 shape
+let targetBlend=0;
 
-function updateCamera(){
- if(!cinematic) return;
- camTime+=0.002;
- camera.position.x=Math.sin(camTime)*40;
- camera.position.y=Math.cos(camTime*0.6)*25;
- camera.lookAt(0,0,0);
-}
-
-/* ================= RENDER ================= */
-function animate(){
- requestAnimationFrame(animate);
- nebula.rotation.y+=0.0003;
- nebula.rotation.x+=0.0002;
- updateCamera();
-
- const p=geo.attributes.position.array;
- for(let i=0;i<STAR_COUNT*3;i++){
-  p[i]+= (target[i]-p[i]) * 0.045;
- }
- geo.attributes.position.needsUpdate=true;
- renderer.render(scene,camera);
-}
-animate();
-
-addEventListener("resize",()=>{
- camera.aspect=innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
-
-/* ================= COLOR THEMES ================= */
-const THEMES={
- 1:[0.7,0.4,1.0],
- 2:[0.4,0.8,1.0],
- 3:[1.0,0.85,0.4],
- 4:[1.0,0.4,0.7],
- 5:[1.0,0.3,0.9],
- fist:[0.95,0.95,1.0]
-};
-
-function applyColor(rgb){
- for(let i=0;i<STAR_COUNT;i++){
-  colors[i*3]=rgb[0];
-  colors[i*3+1]=rgb[1];
-  colors[i*3+2]=rgb[2];
- }
- geo.attributes.color.needsUpdate=true;
-}
-
-/* ================= MORPH ================= */
-function morph(draw,depth=3){
+/* ================= MORPH BUILDER ================= */
+function buildShape(draw){
  const c=document.createElement("canvas");
  const ctx=c.getContext("2d");
- const portrait=innerHeight>innerWidth;
- c.width=portrait?380:900;
- c.height=portrait?560:420;
+ c.width=innerHeight>innerWidth?380:900;
+ c.height=innerHeight>innerWidth?560:420;
 
  ctx.fillStyle="#000";ctx.fillRect(0,0,c.width,c.height);
  draw(ctx,c);
 
  const img=ctx.getImageData(0,0,c.width,c.height).data;
  let i=0;
- for(let z=0;z<depth;z++){
-  for(let y=0;y<c.height;y+=4){
-   for(let x=0;x<c.width;x+=4){
-    if(img[(y*c.width+x)*4]>10 && i<STAR_COUNT){
-     target[i*3]=x-c.width/2;
-     target[i*3+1]=c.height/2-y;
-     target[i*3+2]=(z-(depth/2))*14;
-     i++;
-    }
+ const active=Math.floor(COUNT*0.65); // only 65% stars
+ for(let y=0;y<c.height;y+=4){
+  for(let x=0;x<c.width;x+=4){
+   if(img[(y*c.width+x)*4]>10 && i<active){
+    shape[i*3]=x-c.width/2;
+    shape[i*3+1]=c.height/2-y;
+    shape[i*3+2]=Math.random()*30-15;
+    i++;
    }
   }
  }
- cinematic=false;
+ for(;i<COUNT;i++){
+  shape[i*3]=galaxy[i*3];
+  shape[i*3+1]=galaxy[i*3+1];
+  shape[i*3+2]=galaxy[i*3+2];
+ }
+ targetBlend=1;
 }
 
-/* ================= TEXT ================= */
-function textMorph(text,theme){
- applyColor(THEMES[theme]);
- morph((ctx,c)=>{
+/* ================= TEXT / HEART ================= */
+function textMorph(t){
+ buildShape((ctx,c)=>{
   ctx.fillStyle="#fff";
-  ctx.textAlign="center";
-  ctx.textBaseline="top";
-  ctx.shadowColor="rgba(255,255,255,0.9)";
-  ctx.shadowBlur=28;
-  const size=innerHeight>innerWidth?26:34;
-  ctx.font=size+"px Playfair Display";
-  text.split("\n").forEach((l,i)=>ctx.fillText(l,c.width/2,40+i*(size+16)));
- },3);
+  ctx.font=(innerHeight>innerWidth?26:34)+"px Playfair Display";
+  ctx.textAlign="center";ctx.textBaseline="top";
+  t.split("\n").forEach((l,i)=>ctx.fillText(l,c.width/2,40+i*44));
+ });
 }
-
-/* ================= HEART 3D ================= */
 function heartMorph(){
- applyColor(THEMES[4]);
- morph((ctx,c)=>{
+ buildShape((ctx,c)=>{
   ctx.fillStyle="#fff";
-  ctx.shadowColor="rgba(255,120,180,0.9)";
-  ctx.shadowBlur=35;
   ctx.translate(c.width/2,c.height/2);
-  ctx.scale(1.5,1.5);
+  ctx.scale(1.4,1.4);
   ctx.beginPath();
   ctx.moveTo(0,40);
   ctx.bezierCurveTo(-90,-50,-50,-150,0,-60);
   ctx.bezierCurveTo(50,-150,90,-50,0,40);
   ctx.fill();
- },7);
+ });
 }
 
 /* ================= RESET ================= */
 function resetGalaxy(){
- cinematic=true;
- for(let i=0;i<STAR_COUNT;i++){
-  target[i*3]=(Math.random()-0.5)*1600;
-  target[i*3+1]=(Math.random()-0.5)*1600;
-  target[i*3+2]=(Math.random()-0.5)*1600;
+ targetBlend=0;
+ for(let i=0;i<COUNT;i++){
+  galaxy[i*3]+=(Math.random()-0.5)*40;
+  galaxy[i*3+1]+=(Math.random()-0.5)*40;
+  galaxy[i*3+2]+=(Math.random()-0.5)*40;
  }
 }
 
-/* ================= HAND TRACK ================= */
+/* ================= RENDER LOOP ================= */
+let t=0;
+function animate(){
+ requestAnimationFrame(animate);
+ t+=0.002;
+
+ blend+= (targetBlend-blend)*0.03;
+
+ const p=geo.attributes.position.array;
+ for(let i=0;i<COUNT;i++){
+  const gx=galaxy[i*3];
+  const gy=galaxy[i*3+1];
+  const gz=galaxy[i*3+2];
+
+  const sx=shape[i*3];
+  const sy=shape[i*3+1];
+  const sz=shape[i*3+2];
+
+  p[i*3]   = gx + (sx-gx)*blend + Math.sin(t+i)*0.3;
+  p[i*3+1] = gy + (sy-gy)*blend + Math.cos(t+i)*0.3;
+  p[i*3+2] = gz + (sz-gz)*blend;
+ }
+ geo.attributes.position.needsUpdate=true;
+ renderer.render(scene,camera);
+}
+animate();
+
+/* ================= HAND ================= */
 const video=document.getElementById("video");
 const status=document.getElementById("gestureStatus");
 
 const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-hands.setOptions({
- maxNumHands:1,modelComplexity:0,selfieMode:true,
- minDetectionConfidence:.78,minTrackingConfidence:.72
-});
+hands.setOptions({maxNumHands:1,selfieMode:true,minDetectionConfidence:.75});
 
 let last=null,lastT=0;
 function ext(t,p,m){return Math.atan2(t.y-p.y,t.x-p.x)<Math.atan2(p.y-m.y,p.x-m.x);}
@@ -262,14 +187,14 @@ hands.onResults(r=>{
  if(ext(lm[20],lm[18],lm[17]))f++;
  const g=f===0?"fist":f;
  const now=Date.now();
- if(g!==last && now-lastT>1000){
+ if(g!==last && now-lastT>900){
   last=g;lastT=now;
-  if(g===1)textMorph(`Dear Laily Aliyah,\n\nI want to sincerely apologize for the situation that happened.\nI’m truly sorry if everything made you feel disappointed,\nconfused, or hurt.\n\nWhat hurts me the most is knowing that you thought\nI was lying, even though I was honest from the beginning.`,1);
-  if(g===2)textMorph(`I never intended to deceive you or break your trust.\nI understand your feelings and respect them.\nI hope one day you can believe\nmy words came from a sincere place.`,2);
-  if(g===3)textMorph(`I’m really sorry for the misunderstanding.\nI hope we can clear things up\nand move forward with honesty and respect.`,3);
+  if(g===1)textMorph(`Dear Laily Aliyah\n\nI want to sincerely apologize\nfor the situation that happened.`);
+  if(g===2)textMorph(`I never intended to deceive you.\nI hope you can believe my sincerity.`);
+  if(g===3)textMorph(`I’m really sorry for the misunderstanding.`);
   if(g===4)heartMorph();
-  if(g===5)textMorph(`ilysm ly ♥`,5);
-  if(g==="fist")textMorph(`from:\nRaja Iblis`,"fist");
+  if(g===5)textMorph(`ilysm ly ♥`);
+  if(g==="fist")textMorph(`from:\nRaja Iblis`);
  }
  status.textContent="Detected: "+g;
 });
@@ -280,7 +205,6 @@ document.getElementById("startBtn").onclick=async()=>{
  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:640,height:480}});
  video.srcObject=stream;await video.play();
  new Camera(video,{onFrame:()=>hands.send({image:video}),width:640,height:480}).start();
- document.getElementById("bgm").play();
 };
 </script>
 </body>
