@@ -102,18 +102,26 @@ hands.setOptions({
 
 const debug = document.getElementById("debug");
 
+let lastGesture = "none";
+let stableGesture = "none";
+let gestureStartTime = 0;
+const HOLD_TIME = 800; // ms
+
 hands.onResults(results => {
   if (
     !results.multiHandLandmarks ||
     !results.multiHandedness ||
     results.multiHandLandmarks.length === 0
   ) {
-    debug.textContent = "gesture: none";
+    lastGesture = "none";
+    stableGesture = "none";
+    debug.textContent = "gesture: idle";
     return;
   }
 
   const lm = results.multiHandLandmarks[0];
   const handedness = results.multiHandedness[0].label;
+  const now = performance.now();
 
   const isUp = (tip, pip) => lm[tip].y < lm[pip].y;
 
@@ -127,31 +135,46 @@ hands.onResults(results => {
   const ringUp   = isUp(16,14);
   const pinkyUp  = isUp(20,18);
 
-  let gesture = "unknown";
+  let currentGesture = "unknown";
 
   // ===== PRIORITY RULES =====
   if (!indexUp && !middleUp && !ringUp && !pinkyUp) {
-    gesture = "fist";
+    currentGesture = "fist";
   }
   else if (indexUp && middleUp && !ringUp && !pinkyUp) {
-    gesture = "2 fingers";
+    currentGesture = "2 fingers";
   }
   else {
-    let fingersUp = 0;
-    if (thumbUp) fingersUp++;
-    if (indexUp) fingersUp++;
-    if (middleUp) fingersUp++;
-    if (ringUp) fingersUp++;
-    if (pinkyUp) fingersUp++;
+    let count = 0;
+    if (thumbUp) count++;
+    if (indexUp) count++;
+    if (middleUp) count++;
+    if (ringUp) count++;
+    if (pinkyUp) count++;
 
-    if (fingersUp === 1) gesture = "1 finger";
-    else if (fingersUp === 3) gesture = "3 fingers";
-    else if (fingersUp === 4) gesture = "4 fingers";
-    else if (fingersUp === 5) gesture = "5 fingers";
+    if (count === 1) currentGesture = "1 finger";
+    else if (count === 3) currentGesture = "3 fingers";
+    else if (count === 4) currentGesture = "4 fingers";
+    else if (count === 5) currentGesture = "5 fingers";
   }
 
-  debug.textContent = `gesture: ${gesture}`;
+  // ===== STABILIZER =====
+  if (currentGesture !== lastGesture) {
+    lastGesture = currentGesture;
+    gestureStartTime = now;
+    stableGesture = "none";
+  } else {
+    if (now - gestureStartTime > HOLD_TIME) {
+      stableGesture = currentGesture;
+    }
+  }
+
+  debug.textContent =
+    stableGesture !== "none"
+      ? `gesture: ${stableGesture}`
+      : "gesture: detecting...";
 });
+
 
 /* =========================
    CAMERA UTILS LOOP
