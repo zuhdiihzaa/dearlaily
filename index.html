@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cosmic Gesture Message</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- THREE -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/FontLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/geometries/TextGeometry.js"></script>
+
+<!-- MEDIAPIPE -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+
+<style>
+html,body{margin:0;overflow:hidden;background:black;}
+#camBox{position:fixed;right:12px;bottom:12px;width:220px;height:160px;border-radius:12px;overflow:hidden;border:2px solid white;z-index:10}
+#camBox video{width:100%;height:100%;object-fit:cover}
+#hint{position:absolute;top:0;width:100%;color:white;text-align:center;background:rgba(0,0,0,.5)}
+#startCam{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 22px;font-size:16px;border-radius:12px;border:none;background:#ff66cc;color:white;z-index:20}
+</style>
+</head>
+
+<body>
+
+<button id="startCam">Aktifkan Kamera</button>
+
+<div id="camBox">
+  <div id="hint">Arahkan tangan ke tengah</div>
+  <video id="video" playsinline></video>
+</div>
+
+<script>
+/* ===== THREE BASIC ===== */
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
+camera.position.z=600;
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const starsGeo=new THREE.BufferGeometry();
+const starCount=4000;
+const pos=new Float32Array(starCount*3);
+for(let i=0;i<pos.length;i++) pos[i]=(Math.random()-0.5)*2000;
+starsGeo.setAttribute("position",new THREE.BufferAttribute(pos,3));
+const stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({color:0xffffff,size:2}));
+scene.add(stars);
+
+function animate(){
+  requestAnimationFrame(animate);
+  stars.rotation.y+=0.0004;
+  renderer.render(scene,camera);
+}
+animate();
+
+/* ===== MEDIAPIPE CAMERA ===== */
+const video=document.getElementById("video");
+const startBtn=document.getElementById("startCam");
+
+const hands=new Hands({
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+hands.setOptions({maxNumHands:1,minDetectionConfidence:0.7,minTrackingConfidence:0.7});
+hands.onResults(()=>{});
+
+startBtn.onclick=async()=>{
+  startBtn.style.display="none";
+  try{
+    const cam=new Camera(video,{
+      onFrame:async()=>await hands.send({image:video}),
+      width:640,height:480
+    });
+    await cam.start();
+  }catch(e){
+    alert("Kamera gagal. Pastikan izin kamera diaktifkan.");
+    console.error(e);
+  }
+};
+</script>
+
+</body>
+</html>
