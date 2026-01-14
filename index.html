@@ -5,7 +5,7 @@
 <title>Cosmic Gesture Message</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- THREE -->
+<!-- THREE JS -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/FontLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/geometries/TextGeometry.js"></script>
@@ -15,11 +15,55 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <style>
-html,body{margin:0;overflow:hidden;background:black;}
-#camBox{position:fixed;right:12px;bottom:12px;width:220px;height:160px;border-radius:12px;overflow:hidden;border:2px solid white;z-index:10}
-#camBox video{width:100%;height:100%;object-fit:cover}
-#hint{position:absolute;top:0;width:100%;color:white;text-align:center;background:rgba(0,0,0,.5)}
-#startCam{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 22px;font-size:16px;border-radius:12px;border:none;background:#ff66cc;color:white;z-index:20}
+html,body{
+  margin:0;
+  overflow:hidden;
+  background:black;
+  font-family:Arial, sans-serif;
+}
+
+#camBox{
+  position:fixed;
+  right:12px;
+  bottom:12px;
+  width:220px;
+  height:160px;
+  border-radius:12px;
+  overflow:hidden;
+  border:2px solid rgba(255,255,255,.7);
+  z-index:10;
+}
+
+#camBox video{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+#hint{
+  position:absolute;
+  top:0;
+  width:100%;
+  text-align:center;
+  font-size:13px;
+  color:white;
+  background:rgba(0,0,0,.5);
+}
+
+#startCam{
+  position:fixed;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  padding:14px 24px;
+  font-size:16px;
+  border-radius:14px;
+  border:none;
+  background:#ff66cc;
+  color:white;
+  cursor:pointer;
+  z-index:20;
+}
 </style>
 </head>
 
@@ -33,50 +77,213 @@ html,body{margin:0;overflow:hidden;background:black;}
 </div>
 
 <script>
-/* ===== THREE BASIC ===== */
-const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
-camera.position.z=600;
+/* =========================
+   THREE JS SCENE
+========================= */
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000011, 400, 2500);
 
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
+const camera3D = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 1, 5000);
+camera3D.position.z = 700;
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
-const starsGeo=new THREE.BufferGeometry();
-const starCount=4000;
-const pos=new Float32Array(starCount*3);
-for(let i=0;i<pos.length;i++) pos[i]=(Math.random()-0.5)*2000;
-starsGeo.setAttribute("position",new THREE.BufferAttribute(pos,3));
-const stars=new THREE.Points(starsGeo,new THREE.PointsMaterial({color:0xffffff,size:2}));
+/* LIGHT */
+scene.add(new THREE.AmbientLight(0xffccff, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5,10,7);
+scene.add(dirLight);
+
+/* STARS */
+const STAR_COUNT = 5000;
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(STAR_COUNT * 3);
+for(let i=0;i<starPos.length;i++){
+  starPos[i] = (Math.random() - 0.5) * 3000;
+}
+starGeo.setAttribute("position", new THREE.BufferAttribute(starPos,3));
+const stars = new THREE.Points(
+  starGeo,
+  new THREE.PointsMaterial({color:0xffffff, size:2})
+);
 scene.add(stars);
 
+/* =========================
+   TEXT & HEART
+========================= */
+let font = null;
+let textMesh = null;
+let heartMesh = null;
+
+new THREE.FontLoader().load(
+  "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json",
+  f => font = f
+);
+
+function clearObjects(){
+  if(textMesh){
+    scene.remove(textMesh);
+    textMesh.geometry.dispose();
+    textMesh = null;
+  }
+  if(heartMesh){
+    scene.remove(heartMesh);
+    heartMesh.geometry.dispose();
+    heartMesh = null;
+  }
+}
+
+function showText(msg){
+  if(!font) return;
+  clearObjects();
+
+  const geo = new THREE.TextGeometry(msg,{
+    font:font,
+    size:26,
+    height:6,
+    curveSegments:6
+  });
+  geo.center();
+
+  const mat = new THREE.MeshStandardMaterial({
+    color:0xffb6ff,
+    emissive:0x331133,
+    roughness:0.25
+  });
+
+  textMesh = new THREE.Mesh(geo, mat);
+  scene.add(textMesh);
+}
+
+function showHeart(){
+  clearObjects();
+
+  const s = new THREE.Shape();
+  s.moveTo(0,30);
+  s.bezierCurveTo(0,30,-30,0,-60,0);
+  s.bezierCurveTo(-90,0,-90,45,-90,45);
+  s.bezierCurveTo(-90,75,-45,105,0,120);
+  s.bezierCurveTo(45,105,90,75,90,45);
+  s.bezierCurveTo(90,45,90,0,60,0);
+  s.bezierCurveTo(30,0,0,30,0,30);
+
+  const geo = new THREE.ExtrudeGeometry(s,{
+    depth:20,
+    bevelEnabled:true,
+    bevelSize:5,
+    bevelThickness:5
+  });
+
+  const mat = new THREE.MeshStandardMaterial({
+    color:0xff3366,
+    emissive:0x440011,
+    roughness:0.15
+  });
+
+  heartMesh = new THREE.Mesh(geo, mat);
+  heartMesh.scale.set(2,2,2);
+  scene.add(heartMesh);
+}
+
+/* =========================
+   ANIMATION LOOP
+========================= */
 function animate(){
   requestAnimationFrame(animate);
-  stars.rotation.y+=0.0004;
-  renderer.render(scene,camera);
+  stars.rotation.y += 0.00025;
+  if(heartMesh) heartMesh.rotation.y += 0.01;
+  renderer.render(scene, camera3D);
 }
 animate();
 
-/* ===== MEDIAPIPE CAMERA ===== */
-const video=document.getElementById("video");
-const startBtn=document.getElementById("startCam");
+/* =========================
+   MEDIAPIPE HANDS
+========================= */
+const video = document.getElementById("video");
+const startBtn = document.getElementById("startCam");
 
-const hands=new Hands({
-  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+const hands = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
-hands.setOptions({maxNumHands:1,minDetectionConfidence:0.7,minTrackingConfidence:0.7});
-hands.onResults(()=>{});
 
-startBtn.onclick=async()=>{
-  startBtn.style.display="none";
+hands.setOptions({
+  maxNumHands:1,
+  minDetectionConfidence:0.75,
+  minTrackingConfidence:0.75
+});
+
+let lastGesture = "";
+let cooldown = false;
+
+function trigger(name, action){
+  if(cooldown || lastGesture === name) return;
+  cooldown = true;
+  lastGesture = name;
+  action();
+  setTimeout(()=>cooldown=false, 1200);
+}
+
+hands.onResults(results => {
+  if(!results.multiHandLandmarks || results.multiHandLandmarks.length === 0){
+    lastGesture = "";
+    return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+
+  const indexOpen  = lm[8].y  < lm[6].y;
+  const middleOpen = lm[12].y < lm[10].y;
+  const ringOpen   = lm[16].y < lm[14].y;
+  const pinkyOpen  = lm[20].y < lm[18].y;
+  const thumbOpen  = Math.abs(lm[4].x - lm[3].x) > 0.04;
+
+  // ✊ FIST
+  if(!indexOpen && !middleOpen && !ringOpen && !pinkyOpen && !thumbOpen){
+    trigger("fist",()=>showText("from: Raja Iblis"));
+  }
+
+  // ✌ PEACE
+  if(indexOpen && middleOpen && !ringOpen && !pinkyOpen){
+    trigger("peace",()=>showText(
+      "I never intended to deceive you or break your trust."
+    ));
+  }
+
+  // 🤟 THREE
+  if(indexOpen && middleOpen && ringOpen && !pinkyOpen){
+    trigger("three",()=>showText(
+      "I’m really sorry for the misunderstanding."
+    ));
+  }
+
+  // 🖖 FOUR
+  if(!thumbOpen && indexOpen && middleOpen && ringOpen && pinkyOpen){
+    trigger("four",showHeart);
+  }
+
+  // 🖐 FIVE
+  if(thumbOpen && indexOpen && middleOpen && ringOpen && pinkyOpen){
+    trigger("five",()=>showText("ilysm ly ♥"));
+  }
+});
+
+/* CAMERA START (USER GESTURE SAFE) */
+startBtn.onclick = async () => {
+  startBtn.style.display = "none";
   try{
-    const cam=new Camera(video,{
-      onFrame:async()=>await hands.send({image:video}),
-      width:640,height:480
+    const cam = new Camera(video,{
+      onFrame: async () => {
+        await hands.send({image: video});
+      },
+      width:640,
+      height:480
     });
     await cam.start();
   }catch(e){
-    alert("Kamera gagal. Pastikan izin kamera diaktifkan.");
+    alert("Kamera gagal diakses. Aktifkan izin kamera.");
     console.error(e);
   }
 };
