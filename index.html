@@ -1,56 +1,57 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cosmic Space</title>
+<title>For You</title>
 
 <style>
 html,body{
   margin:0;
-  background:black;
+  width:100%;
+  height:100%;
   overflow:hidden;
-  font-family: "Georgia", serif;
+  background:#000;
+  font-family:"Georgia", "Times New Roman", serif;
 }
 
-/* ===== COSMIC BACKGROUND ===== */
+/* ===== DEEP SPACE ===== */
 #space{
   position:fixed;
   inset:0;
   background:
-    radial-gradient(circle at 20% 30%, rgba(120,80,255,.35), transparent 60%),
-    radial-gradient(circle at 80% 40%, rgba(255,120,200,.25), transparent 55%),
-    radial-gradient(circle at 50% 70%, rgba(255,200,120,.2), transparent 65%),
-    black;
-  animation: nebula 60s linear infinite;
+    radial-gradient(circle at 30% 40%, rgba(255,120,180,0.25), transparent 55%),
+    radial-gradient(circle at 70% 60%, rgba(120,160,255,0.22), transparent 60%),
+    radial-gradient(circle at 50% 80%, rgba(255,200,140,0.18), transparent 65%),
+    #000;
+  animation: nebulaMove 80s linear infinite;
 }
 
-@keyframes nebula{
-  0%{background-position:0 0}
-  100%{background-position:600px 300px}
+@keyframes nebulaMove{
+  from{background-position:0 0}
+  to{background-position:600px 300px}
 }
 
-/* ===== STAR LAYERS ===== */
-.stars{
+/* ===== STARS ===== */
+.star-layer{
   position:fixed;
   inset:0;
-  background-image:
-    radial-gradient(white 1px, transparent 1px);
+  background-image: radial-gradient(white 1.2px, transparent 1.2px);
+  background-size: 4px 4px;
+  opacity:0.35;
+  animation: drift 120s linear infinite;
+}
+
+.star-layer.mid{
   background-size:3px 3px;
-  opacity:.5;
-  animation: drift 80s linear infinite;
+  opacity:0.55;
+  animation-duration:90s;
 }
 
-.stars.back{
-  background-size:4px 4px;
-  opacity:.3;
-  animation-duration:120s;
-}
-
-.stars.front{
+.star-layer.front{
   background-size:2px 2px;
-  opacity:.8;
-  animation-duration:50s;
+  opacity:0.85;
+  animation-duration:60s;
 }
 
 @keyframes drift{
@@ -59,24 +60,25 @@ html,body{
 }
 
 /* ===== TEXT ===== */
-#text{
+#message{
   position:fixed;
   inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
-  padding:24px;
+  padding:26px;
   text-align:center;
-  color:white;
-  font-size:clamp(18px,4.5vw,36px);
-  line-height:1.6;
+  color:#fff;
+  font-size:clamp(18px,4.6vw,34px);
+  line-height:1.65;
   text-shadow:
-    0 0 20px rgba(255,255,255,.4),
-    0 0 60px rgba(200,150,255,.35);
+    0 0 12px rgba(255,180,220,0.8),
+    0 0 35px rgba(200,160,255,0.6),
+    0 0 80px rgba(255,200,160,0.35);
   opacity:0;
-  transform:translateY(20px);
-  animation: fadeIn 3s ease forwards;
-  animation-delay:2s;
+  transform:translateY(18px);
+  animation: fadeIn 4s ease forwards;
+  animation-delay:3s;
 }
 
 @keyframes fadeIn{
@@ -85,20 +87,34 @@ html,body{
     transform:translateY(0);
   }
 }
+
+/* subtle breathing glow */
+#message span{
+  animation: glow 6s ease-in-out infinite;
+}
+
+@keyframes glow{
+  0%,100%{opacity:0.85}
+  50%{opacity:1}
+}
 </style>
 </head>
+
 <body>
 
 <div id="space"></div>
-<div class="stars back"></div>
-<div class="stars"></div>
-<div class="stars front"></div>
+<div class="star-layer"></div>
+<div class="star-layer mid"></div>
+<div class="star-layer front"></div>
 
-<div id="text">
-Dear Laily Aliyah,<br><br>
-I want to sincerely apologize for the situation that happened.<br>
-I never intended to hurt you.<br><br>
-My words came from a sincere place.
+<div id="message">
+  <span>
+  Dear Laily Aliyah,<br><br>
+  I want to sincerely apologize for the situation that happened.<br><br>
+  I never intended to hurt you or make you feel unsure.<br><br>
+  My words came from a sincere place,<br>
+  and they always will.
+  </span>
 </div>
 
 </body>
