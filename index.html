@@ -3,28 +3,52 @@
 /* =========================
    TEXT TARGET FACTORY
 ========================= */
-function generateTextTargets(text, scale=0.3) {
-  const c=document.createElement("canvas");
-  c.width=900; c.height=240;
-  const ctx=c.getContext("2d");
-  ctx.clearRect(0,0,c.width,c.height);
-  ctx.font="64px serif";
-  ctx.textAlign="center";
-  ctx.fillStyle="white";
-  ctx.fillText(text,c.width/2,c.height/2);
+function generateTextTargets(text, scale = 0.26, maxWidth = 780) {
+  const c = document.createElement("canvas");
+  c.width = 1000;
+  c.height = 420;
+  const ctx = c.getContext("2d");
 
-  const d=ctx.getImageData(0,0,c.width,c.height).data;
-  const t=[];
-  for(let y=0;y<c.height;y+=4){
-    for(let x=0;x<c.width;x+=4){
-      if(d[(y*c.width+x)*4+3]>150){
-        t.push({x:(x-c.width/2)*scale,y:(c.height/2-y)*scale,z:0});
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.font = "52px serif";
+
+  // word wrap
+  const words = text.split(" ");
+  let line = "";
+  const lines = [];
+  for (let w of words) {
+    const test = line + w + " ";
+    if (ctx.measureText(test).width > maxWidth) {
+      lines.push(line);
+      line = w + " ";
+    } else {
+      line = test;
+    }
+  }
+  lines.push(line);
+
+  const startY = c.height / 2 - lines.length * 30;
+  lines.forEach((l, i) => {
+    ctx.fillText(l.trim(), c.width / 2, startY + i * 60);
+  });
+
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  const t = [];
+  for (let y = 0; y < c.height; y += 4) {
+    for (let x = 0; x < c.width; x += 4) {
+      if (d[(y * c.width + x) * 4 + 3] > 150) {
+        t.push({
+          x: (x - c.width / 2) * scale,
+          y: (c.height / 2 - y) * scale,
+          z: 0
+        });
       }
     }
   }
   return t;
 }
-
 /* =========================
    HEART TARGET
 ========================= */
@@ -41,13 +65,43 @@ function generateHeartTargets() {
 /* =========================
    TARGET MAP
 ========================= */
-const TARGETS={
-  "1 finger":generateTextTargets("Dear Laily"),
-  "2 fingers":generateTextTargets("I'm sorry…"),
-  "3 fingers":generateTextTargets("I miss you"),
-  "4 fingers":generateTextTargets("Please forgive me"),
-  "5 fingers":generateTextTargets("I love you ❤️",0.28),
-  "fist":generateHeartTargets()
+const TARGETS = {
+  "1 finger": generateTextTargets(
+`Dear Laily Aliyah,
+
+I want to sincerely apologize for the situation that happened.
+I’m truly sorry if everything made you feel disappointed,
+confused, or hurt.
+
+What hurts me the most is knowing that you thought I was lying,
+even though I was being honest from the beginning.`
+  ),
+
+  "2 fingers": generateTextTargets(
+`I never intended to deceive you or break your trust in any way.
+I understand why you might have felt that way,
+and I respect your feelings.
+
+Still, I hope one day you can believe
+that my words were genuine
+and came from a sincere place.`
+  ),
+
+  "3 fingers": generateTextTargets(
+`I’m really sorry for the misunderstanding,
+and I truly hope we can clear things up
+and move forward with honesty and respect.`
+  ),
+
+  "4 fingers": generateHeartTargets(),
+
+  "5 fingers": generateTextTargets(
+`ilysm ly ♥`
+  ),
+
+  "fist": generateTextTargets(
+`from: Raja Iblis`
+  )
 };
 
 let activeTargets=null;
