@@ -3,191 +3,177 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cosmic Message</title>
+<title>Cosmic Letter</title>
 
 <style>
 html,body{
   margin:0;
   background:black;
   overflow:hidden;
-  font-family: "Georgia", serif;
 }
-canvas{position:fixed;top:0;left:0;}
-
-#overlay{
-  position:fixed;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  padding:20px;
-  pointer-events:none;
-}
-
-#text{
-  color:#fff;
-  font-size:clamp(18px,4.5vw,34px);
-  line-height:1.6;
-  max-width:720px;
-  opacity:0;
-  transform:translateY(20px);
-  transition:opacity 1.8s ease, transform 1.8s ease;
-  text-shadow:0 0 20px rgba(255,255,255,.35);
-}
-
-#halo{
-  position:fixed;
-  width:26px;height:26px;
-  border-radius:50%;
-  background:rgba(120,220,255,.8);
-  box-shadow:0 0 35px rgba(120,220,255,1);
-  opacity:0;
-  transition:.3s;
-  pointer-events:none;
-}
+canvas{position:fixed;top:0;left:0}
 
 video{
   position:fixed;
-  bottom:14px;
-  right:14px;
-  width:120px;
-  border-radius:14px;
-  opacity:.85;
+  bottom:12px;
+  right:12px;
+  width:110px;
+  border-radius:12px;
+  opacity:.75;
   transform:scaleX(-1);
 }
 </style>
 </head>
-
 <body>
 
-<canvas id="bg"></canvas>
-<div id="overlay"><div id="text"></div></div>
-<div id="halo"></div>
+<canvas id="c"></canvas>
 <video id="cam" autoplay playsinline></video>
 
 <script>
-/* ========= STARFIELD ========= */
-const canvas = document.getElementById("bg");
+/* ================= BASIC SETUP ================= */
+const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 function resize(){
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+  canvas.width=innerWidth;
+  canvas.height=innerHeight;
 }
-resize(); addEventListener("resize", resize);
+resize(); addEventListener("resize",resize);
 
-const stars=[...Array(420)].map(()=>({
-  x:Math.random()*canvas.width,
-  y:Math.random()*canvas.height,
-  r:Math.random()*1.6,
-  vx:(Math.random()-.5)*0.15,
-  vy:(Math.random()-.5)*0.15,
-  c:`hsl(${200+Math.random()*120},100%,70%)`
-}));
+/* ================= CAMERA (HAND ONLY) ================= */
+const video=document.getElementById("cam");
+navigator.mediaDevices.getUserMedia({video:true})
+.then(s=>video.srcObject=s);
 
-function animate(){
+/* ================= STAR PARTICLES ================= */
+const STAR_COUNT = 1200;
+const stars=[];
+for(let i=0;i<STAR_COUNT;i++){
+  stars.push({
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    z:Math.random()*1,
+    tx:null, ty:null,
+    a:Math.random()*Math.PI*2
+  });
+}
+
+/* ================= DRAW ================= */
+function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
   stars.forEach(s=>{
-    s.x+=s.vx; s.y+=s.vy;
-    if(s.x<0)s.x=canvas.width;
-    if(s.y<0)s.y=canvas.height;
-    ctx.fillStyle=s.c;
+    s.a+=0.002;
+    if(s.tx!==null){
+      s.x += (s.tx-s.x)*0.08;
+      s.y += (s.ty-s.y)*0.08;
+    }else{
+      s.x += Math.cos(s.a)*0.15;
+      s.y += Math.sin(s.a)*0.15;
+    }
+
+    const size = 1.2 + s.z*1.8;
+    ctx.fillStyle=`rgba(180,220,255,0.85)`;
     ctx.beginPath();
-    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.arc(s.x,s.y,size,0,Math.PI*2);
     ctx.fill();
   });
-  requestAnimationFrame(animate);
+
+  requestAnimationFrame(draw);
 }
-animate();
+draw();
 
-/* ========= CAMERA ========= */
-const video = document.getElementById("cam");
-navigator.mediaDevices.getUserMedia({video:true})
-.then(s=>video.srcObject=s)
-.catch(()=>alert("Camera permission dibutuhkan"));
+/* ================= TEXT TO STARS ================= */
+function textToStars(text){
+  const off=document.createElement("canvas");
+  const octx=off.getContext("2d");
+  off.width=canvas.width;
+  off.height=canvas.height;
 
-/* ========= MOTION / SHAPE DETECTION ========= */
+  octx.fillStyle="white";
+  octx.font=`bold ${Math.min(canvas.width/14,64)}px Georgia`;
+  octx.textAlign="center";
+  octx.textBaseline="middle";
+
+  const lines=text.split("\n");
+  lines.forEach((l,i)=>{
+    octx.fillText(l,off.width/2,off.height/2+i*70);
+  });
+
+  const img=octx.getImageData(0,0,off.width,off.height).data;
+  const pts=[];
+  for(let y=0;y<off.height;y+=6){
+    for(let x=0;x<off.width;x+=6){
+      if(img[(y*off.width+x)*4]>200){
+        pts.push({x,y});
+      }
+    }
+  }
+
+  stars.forEach((s,i)=>{
+    const p=pts[i%pts.length];
+    s.tx=p.x;
+    s.ty=p.y;
+  });
+}
+
+/* ================= RELEASE ================= */
+function releaseStars(){
+  stars.forEach(s=>{
+    s.tx=null;
+    s.ty=null;
+  });
+}
+
+/* ================= MESSAGES ================= */
+const MESSAGE_OPEN =
+`Dear Laily Aliyah,
+I want to sincerely apologize for the situation that happened.
+I was honest from the beginning,
+and my words came from a sincere place.`;
+
+const MESSAGE_FIST =
+`ilysm ly ♥
+from: Raja Iblis`;
+
+/* ================= HAND DETECTION (NO FACE) ================= */
 const off=document.createElement("canvas");
 const offCtx=off.getContext("2d");
 off.width=160; off.height=120;
 
 let last=null;
-let stableCount=0;
-let mode="idle"; // idle | open | fist
-
-const textBox=document.getElementById("text");
-const halo=document.getElementById("halo");
-
-const MESSAGE_OPEN = `Dear Laily Aliyah,<br><br>
-I want to sincerely apologize for the situation that happened.
-I’m truly sorry if everything made you feel disappointed,
-confused, or hurt.<br><br>
-I never intended to deceive you or break your trust in any way.
-My words were honest from the beginning, and they came from
-a sincere place.`;
-
-const MESSAGE_FIST = `I’m really sorry for the misunderstanding.
-I hope one day you can believe my honesty.<br><br>
-<span style="font-size:1.2em">ilysm ly ♥</span><br><br>
-<span style="opacity:.7">from: Raja Iblis</span>`;
+let stable=0;
+let mode="idle";
 
 setInterval(()=>{
-  if(video.videoWidth===0) return;
-
+  if(video.videoWidth===0)return;
   offCtx.drawImage(video,0,0,off.width,off.height);
-  const data = offCtx.getImageData(0,0,off.width,off.height).data;
+  const d=offCtx.getImageData(0,0,off.width,off.height).data;
 
   if(last){
     let diff=0, bright=0;
-    for(let i=0;i<data.length;i+=4){
-      diff+=Math.abs(data[i]-last[i]);
-      bright+=data[i];
+    for(let i=0;i<d.length;i+=4){
+      diff+=Math.abs(d[i]-last[i]);
+      bright+=d[i];
     }
 
-    const avgBright = bright/(data.length/4);
-
-    if(diff>280000){
-      stableCount++;
-      halo.style.opacity=1;
-      halo.style.left="50%";
-      halo.style.top="50%";
-
-      // heuristik bentuk
-      if(avgBright>110){
-        if(mode!=="open" && stableCount>5){
+    if(diff>260000){
+      stable++;
+      if(stable>6){
+        if(bright/ (d.length/4) > 110 && mode!=="open"){
           mode="open";
-          showMessage(MESSAGE_OPEN);
-          pullStars();
+          textToStars(MESSAGE_OPEN);
         }
-      }else{
-        if(mode!=="fist" && stableCount>5){
+        if(bright/ (d.length/4) <=110 && mode!=="fist"){
           mode="fist";
-          showMessage(MESSAGE_FIST);
-          pullStars();
+          textToStars(MESSAGE_FIST);
         }
       }
-
     }else{
-      stableCount=0;
-      halo.style.opacity=0;
+      stable=0;
     }
   }
-  last=data;
+  last=d;
 },200);
-
-/* ========= VISUAL ACTION ========= */
-function showMessage(msg){
-  textBox.innerHTML=msg;
-  textBox.style.opacity=1;
-  textBox.style.transform="translateY(0)";
-}
-
-function pullStars(){
-  stars.forEach(s=>{
-    s.vx=(canvas.width/2-s.x)/120;
-    s.vy=(canvas.height/2-s.y)/120;
-  });
-}
 </script>
 </body>
 </html>
