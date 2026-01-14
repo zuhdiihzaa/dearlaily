@@ -113,53 +113,45 @@ hands.onResults(results => {
   }
 
   const lm = results.multiHandLandmarks[0];
-  const handedness = results.multiHandedness[0].label; // "Left" / "Right"
+  const handedness = results.multiHandedness[0].label;
 
-  let fingersUp = 0;
+  const isUp = (tip, pip) => lm[tip].y < lm[pip].y;
 
-  // ======================
-  // THUMB (pakai handedness)
-  // ======================
-  const thumbTip = lm[4];
-  const thumbIP  = lm[3];
+  const thumbUp =
+    handedness === "Right"
+      ? lm[4].x < lm[3].x
+      : lm[4].x > lm[3].x;
 
-  if (handedness === "Right") {
-    if (thumbTip.x < thumbIP.x) fingersUp++;
-  } else {
-    if (thumbTip.x > thumbIP.x) fingersUp++;
-  }
-
-  // ======================
-  // OTHER FINGERS (Y + Z)
-  // ======================
-  const fingers = [
-    [8, 6],   // index
-    [12,10],  // middle
-    [16,14],  // ring
-    [20,18]   // pinky
-  ];
-
-  fingers.forEach(([tip, pip]) => {
-    if (
-      lm[tip].y < lm[pip].y &&
-      Math.abs(lm[tip].z) < Math.abs(lm[pip].z)
-    ) {
-      fingersUp++;
-    }
-  });
+  const indexUp  = isUp(8, 6);
+  const middleUp = isUp(12,10);
+  const ringUp   = isUp(16,14);
+  const pinkyUp  = isUp(20,18);
 
   let gesture = "unknown";
-  if (fingersUp === 0) gesture = "fist";
-  else if (fingersUp === 1) gesture = "1 finger";
-  else if (fingersUp === 2) gesture = "2 fingers";
-  else if (fingersUp === 3) gesture = "3 fingers";
-  else if (fingersUp === 4) gesture = "4 fingers";
-  else if (fingersUp === 5) gesture = "5 fingers";
+
+  // ===== PRIORITY RULES =====
+  if (!indexUp && !middleUp && !ringUp && !pinkyUp) {
+    gesture = "fist";
+  }
+  else if (indexUp && middleUp && !ringUp && !pinkyUp) {
+    gesture = "2 fingers";
+  }
+  else {
+    let fingersUp = 0;
+    if (thumbUp) fingersUp++;
+    if (indexUp) fingersUp++;
+    if (middleUp) fingersUp++;
+    if (ringUp) fingersUp++;
+    if (pinkyUp) fingersUp++;
+
+    if (fingersUp === 1) gesture = "1 finger";
+    else if (fingersUp === 3) gesture = "3 fingers";
+    else if (fingersUp === 4) gesture = "4 fingers";
+    else if (fingersUp === 5) gesture = "5 fingers";
+  }
 
   debug.textContent = `gesture: ${gesture}`;
 });
-
-
 
 /* =========================
    CAMERA UTILS LOOP
