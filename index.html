@@ -3,126 +3,191 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cosmic Presence</title>
+<title>Cosmic Message</title>
 
 <style>
 html,body{
- margin:0;
- background:black;
- overflow:hidden;
- font-family:system-ui;
+  margin:0;
+  background:black;
+  overflow:hidden;
+  font-family: "Georgia", serif;
 }
 canvas{position:fixed;top:0;left:0;}
-#halo{
- position:fixed;
- bottom:20%;
- left:50%;
- transform:translateX(-50%);
- width:24px;height:24px;
- border-radius:50%;
- background:#6ff;
- box-shadow:0 0 30px #6ff;
- opacity:0;
- transition:.3s;
+
+#overlay{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:20px;
+  pointer-events:none;
 }
+
 #text{
- position:fixed;
- top:45%;
- width:100%;
- text-align:center;
- font-size:clamp(28px,7vw,64px);
- color:white;
- letter-spacing:4px;
- opacity:0;
- transition:1.5s;
+  color:#fff;
+  font-size:clamp(18px,4.5vw,34px);
+  line-height:1.6;
+  max-width:720px;
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity 1.8s ease, transform 1.8s ease;
+  text-shadow:0 0 20px rgba(255,255,255,.35);
 }
+
+#halo{
+  position:fixed;
+  width:26px;height:26px;
+  border-radius:50%;
+  background:rgba(120,220,255,.8);
+  box-shadow:0 0 35px rgba(120,220,255,1);
+  opacity:0;
+  transition:.3s;
+  pointer-events:none;
+}
+
 video{
- position:fixed;
- bottom:12px;
- right:12px;
- width:120px;
- border-radius:12px;
- opacity:.85;
- transform:scaleX(-1);
+  position:fixed;
+  bottom:14px;
+  right:14px;
+  width:120px;
+  border-radius:14px;
+  opacity:.85;
+  transform:scaleX(-1);
 }
 </style>
 </head>
 
 <body>
+
 <canvas id="bg"></canvas>
+<div id="overlay"><div id="text"></div></div>
 <div id="halo"></div>
-<div id="text">AKU MELIHATMU</div>
 <video id="cam" autoplay playsinline></video>
 
 <script>
-const video=document.getElementById("cam");
-navigator.mediaDevices.getUserMedia({video:true}).then(s=>video.srcObject=s);
+/* ========= STARFIELD ========= */
+const canvas = document.getElementById("bg");
+const ctx = canvas.getContext("2d");
+function resize(){
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+resize(); addEventListener("resize", resize);
 
-const c=document.getElementById("bg");
-const ctx=c.getContext("2d");
-c.width=innerWidth;
-c.height=innerHeight;
-
-const stars=[...Array(350)].map(()=>({
- x:Math.random()*c.width,
- y:Math.random()*c.height,
- r:Math.random()*1.5,
- vx:(Math.random()-.5)*0.2,
- vy:(Math.random()-.5)*0.2,
- c:`hsl(${200+Math.random()*120},100%,70%)`
+const stars=[...Array(420)].map(()=>({
+  x:Math.random()*canvas.width,
+  y:Math.random()*canvas.height,
+  r:Math.random()*1.6,
+  vx:(Math.random()-.5)*0.15,
+  vy:(Math.random()-.5)*0.15,
+  c:`hsl(${200+Math.random()*120},100%,70%)`
 }));
 
-function draw(){
- ctx.clearRect(0,0,c.width,c.height);
- stars.forEach(s=>{
-  s.x+=s.vx; s.y+=s.vy;
-  if(s.x<0)s.x=c.width;
-  if(s.y<0)s.y=c.height;
-  ctx.fillStyle=s.c;
-  ctx.beginPath();
-  ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-  ctx.fill();
- });
- requestAnimationFrame(draw);
+function animate(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  stars.forEach(s=>{
+    s.x+=s.vx; s.y+=s.vy;
+    if(s.x<0)s.x=canvas.width;
+    if(s.y<0)s.y=canvas.height;
+    ctx.fillStyle=s.c;
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fill();
+  });
+  requestAnimationFrame(animate);
 }
-draw();
+animate();
 
-// === MOTION DETECTION ===
+/* ========= CAMERA ========= */
+const video = document.getElementById("cam");
+navigator.mediaDevices.getUserMedia({video:true})
+.then(s=>video.srcObject=s)
+.catch(()=>alert("Camera permission dibutuhkan"));
+
+/* ========= MOTION / SHAPE DETECTION ========= */
 const off=document.createElement("canvas");
 const offCtx=off.getContext("2d");
 off.width=160; off.height=120;
 
 let last=null;
-let motionFrames=0;
-let triggered=false;
+let stableCount=0;
+let mode="idle"; // idle | open | fist
+
+const textBox=document.getElementById("text");
+const halo=document.getElementById("halo");
+
+const MESSAGE_OPEN = `Dear Laily Aliyah,<br><br>
+I want to sincerely apologize for the situation that happened.
+I’m truly sorry if everything made you feel disappointed,
+confused, or hurt.<br><br>
+I never intended to deceive you or break your trust in any way.
+My words were honest from the beginning, and they came from
+a sincere place.`;
+
+const MESSAGE_FIST = `I’m really sorry for the misunderstanding.
+I hope one day you can believe my honesty.<br><br>
+<span style="font-size:1.2em">ilysm ly ♥</span><br><br>
+<span style="opacity:.7">from: Raja Iblis</span>`;
 
 setInterval(()=>{
- if(video.videoWidth===0)return;
- offCtx.drawImage(video,0,0,off.width,off.height);
- const data=offCtx.getImageData(0,0,off.width,off.height).data;
- if(last){
-  let diff=0;
-  for(let i=0;i<data.length;i+=4){
-   diff+=Math.abs(data[i]-last[i]);
-  }
-  if(diff>300000){
-    motionFrames++;
-    document.getElementById("halo").style.opacity=1;
-    if(motionFrames>5 && !triggered){
-      triggered=true;
-      document.getElementById("text").style.opacity=1;
-      stars.forEach(s=>{
-        s.vx=(c.width/2-s.x)/120;
-        s.vy=(c.height/2-s.y)/120;
-      });
+  if(video.videoWidth===0) return;
+
+  offCtx.drawImage(video,0,0,off.width,off.height);
+  const data = offCtx.getImageData(0,0,off.width,off.height).data;
+
+  if(last){
+    let diff=0, bright=0;
+    for(let i=0;i<data.length;i+=4){
+      diff+=Math.abs(data[i]-last[i]);
+      bright+=data[i];
     }
-  }else{
-    motionFrames=0;
-    document.getElementById("halo").style.opacity=0;
+
+    const avgBright = bright/(data.length/4);
+
+    if(diff>280000){
+      stableCount++;
+      halo.style.opacity=1;
+      halo.style.left="50%";
+      halo.style.top="50%";
+
+      // heuristik bentuk
+      if(avgBright>110){
+        if(mode!=="open" && stableCount>5){
+          mode="open";
+          showMessage(MESSAGE_OPEN);
+          pullStars();
+        }
+      }else{
+        if(mode!=="fist" && stableCount>5){
+          mode="fist";
+          showMessage(MESSAGE_FIST);
+          pullStars();
+        }
+      }
+
+    }else{
+      stableCount=0;
+      halo.style.opacity=0;
+    }
   }
- }
- last=data;
+  last=data;
 },200);
+
+/* ========= VISUAL ACTION ========= */
+function showMessage(msg){
+  textBox.innerHTML=msg;
+  textBox.style.opacity=1;
+  textBox.style.transform="translateY(0)";
+}
+
+function pullStars(){
+  stars.forEach(s=>{
+    s.vx=(canvas.width/2-s.x)/120;
+    s.vy=(canvas.height/2-s.y)/120;
+  });
+}
 </script>
 </body>
 </html>
