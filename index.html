@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Dear Laily — Gesture Test</title>
+<title>Dear Laily — Star Message</title>
 
 <style>
 html, body {
@@ -23,7 +23,6 @@ canvas { display: block; }
   border-radius: 14px;
   overflow: hidden;
   background: #000;
-  box-shadow: 0 0 20px rgba(120,80,255,0.35);
   border: 1px solid rgba(180,140,255,0.35);
   z-index: 10;
 }
@@ -38,16 +37,6 @@ canvas { display: block; }
   inset: 10px;
   border: 1px dashed rgba(255,255,255,0.45);
   border-radius: 10px;
-}
-#camera-dot {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: rgba(255,255,255,0.8);
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
 }
 #debug {
   position: fixed;
@@ -66,147 +55,176 @@ canvas { display: block; }
 <div id="camera-box">
   <video id="camera" autoplay playsinline muted></video>
   <div id="camera-guide"></div>
-  <div id="camera-dot"></div>
 </div>
-<div id="debug">gesture: none</div>
+<div id="debug">gesture: idle</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 /* =========================
-   CAMERA STREAM
+   CAMERA
 ========================= */
 const video = document.getElementById("camera");
-navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "user" },
-  audio: false
-}).then(stream => video.srcObject = stream);
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+  .then(s => video.srcObject = s);
 
 /* =========================
-   MEDIAPIPE HANDS
-========================= */
-const hands = new Hands({
-  locateFile: file =>
-    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-});
-hands.setOptions({
-  maxNumHands: 1,
-  modelComplexity: 0,
-  minDetectionConfidence: 0.6,
-  minTrackingConfidence: 0.6
-});
-
-const debug = document.getElementById("debug");
-
-let lastGesture = "none";
-let stableGesture = "none";
-let gestureStartTime = 0;
-const HOLD_TIME = 800; // ms
-
-hands.onResults(results => {
-  if (
-    !results.multiHandLandmarks ||
-    !results.multiHandedness ||
-    results.multiHandLandmarks.length === 0
-  ) {
-    lastGesture = "none";
-    stableGesture = "none";
-    debug.textContent = "gesture: idle";
-    return;
-  }
-
-  const lm = results.multiHandLandmarks[0];
-  const handedness = results.multiHandedness[0].label;
-  const now = performance.now();
-
-  const isUp = (tip, pip) => lm[tip].y < lm[pip].y;
-
-  const thumbUp =
-    handedness === "Right"
-      ? lm[4].x < lm[3].x
-      : lm[4].x > lm[3].x;
-
-  const indexUp  = isUp(8, 6);
-  const middleUp = isUp(12,10);
-  const ringUp   = isUp(16,14);
-  const pinkyUp  = isUp(20,18);
-
-  let currentGesture = "unknown";
-
-  // ===== PRIORITY RULES =====
-  if (!indexUp && !middleUp && !ringUp && !pinkyUp) {
-    currentGesture = "fist";
-  }
-  else if (indexUp && middleUp && !ringUp && !pinkyUp) {
-    currentGesture = "2 fingers";
-  }
-  else {
-    let count = 0;
-    if (thumbUp) count++;
-    if (indexUp) count++;
-    if (middleUp) count++;
-    if (ringUp) count++;
-    if (pinkyUp) count++;
-
-    if (count === 1) currentGesture = "1 finger";
-    else if (count === 3) currentGesture = "3 fingers";
-    else if (count === 4) currentGesture = "4 fingers";
-    else if (count === 5) currentGesture = "5 fingers";
-  }
-
-  // ===== STABILIZER =====
-  if (currentGesture !== lastGesture) {
-    lastGesture = currentGesture;
-    gestureStartTime = now;
-    stableGesture = "none";
-  } else {
-    if (now - gestureStartTime > HOLD_TIME) {
-      stableGesture = currentGesture;
-    }
-  }
-
-  debug.textContent =
-    stableGesture !== "none"
-      ? `gesture: ${stableGesture}`
-      : "gesture: detecting...";
-});
-
-
-/* =========================
-   CAMERA UTILS LOOP
-========================= */
-const cam = new Camera(video, {
-  onFrame: async () => {
-    await hands.send({ image: video });
-  },
-  width: 640,
-  height: 480
-});
-cam.start();
-
-/* =========================
-   THREE SCENE (IDLE ONLY)
+   THREE SETUP
 ========================= */
 const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050010, 0.0012);
+
 const camera3D = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
 camera3D.position.z = 120;
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 document.body.appendChild(renderer.domElement);
 
-const stars = new THREE.Points(
-  new THREE.BufferGeometry(),
-  new THREE.PointsMaterial({ size: 1 })
-);
+/* =========================
+   STAR TEXTURE
+========================= */
+function createStarTexture() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,"rgba(255,255,255,1)");
+  g.addColorStop(0.4,"rgba(180,200,255,0.7)");
+  g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+const starTexture = createStarTexture();
+
+/* =========================
+   STAR FIELD
+========================= */
+const COUNT = 1200;
+const geo = new THREE.BufferGeometry();
+const pos = new Float32Array(COUNT * 3);
+const basePos = new Float32Array(COUNT * 3);
+
+for (let i = 0; i < COUNT; i++) {
+  const i3 = i * 3;
+  basePos[i3] = pos[i3] = (Math.random() - 0.5) * 400;
+  basePos[i3+1] = pos[i3+1] = (Math.random() - 0.5) * 400;
+  basePos[i3+2] = pos[i3+2] = (Math.random() - 0.5) * 400;
+}
+
+geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+
+const mat = new THREE.PointsMaterial({
+  size: 2.2,
+  map: starTexture,
+  transparent: true,
+  opacity: 0.9,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+
+const stars = new THREE.Points(geo, mat);
 scene.add(stars);
 
+/* =========================
+   TEXT TARGET (OFFSCREEN)
+========================= */
+function generateTextTargets(text) {
+  const c = document.createElement("canvas");
+  c.width = 800;
+  c.height = 200;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.font = "64px serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "white";
+  ctx.fillText(text, c.width/2, c.height/2);
+
+  const data = ctx.getImageData(0,0,c.width,c.height).data;
+  const targets = [];
+
+  for (let y = 0; y < c.height; y += 4) {
+    for (let x = 0; x < c.width; x += 4) {
+      const i = (y * c.width + x) * 4;
+      if (data[i+3] > 150) {
+        targets.push({
+          x: (x - c.width/2) * 0.3,
+          y: (c.height/2 - y) * 0.3,
+          z: 0
+        });
+      }
+    }
+  }
+  return targets;
+}
+
+const textTargets = generateTextTargets("Dear Laily");
+
+/* =========================
+   STATE
+========================= */
+let mode = "idle"; // idle | text
+
+/* =========================
+   MEDIAPIPE + STABILIZER
+========================= */
+let lastGesture="none", stableGesture="none", t0=0;
+const HOLD=800;
+const debug=document.getElementById("debug");
+
+const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+hands.setOptions({maxNumHands:1,modelComplexity:0,minDetectionConfidence:0.6,minTrackingConfidence:0.6});
+
+hands.onResults(r=>{
+  if(!r.multiHandLandmarks||!r.multiHandedness){stableGesture="none";return;}
+  const lm=r.multiHandLandmarks[0];
+  const up=(a,b)=>lm[a].y<lm[b].y;
+  const index=up(8,6), middle=up(12,10), ring=up(16,14), pinky=up(20,18);
+  let g="other";
+  if(index&&!middle&&!ring&&!pinky) g="1 finger";
+  const now=performance.now();
+  if(g!==lastGesture){lastGesture=g;t0=now;stableGesture="none";}
+  else if(now-t0>HOLD) stableGesture=g;
+  debug.textContent="gesture: "+(stableGesture||"detecting");
+});
+
+new Camera(video,{onFrame:async()=>hands.send({image:video}),width:640,height:480}).start();
+
+/* =========================
+   ANIMATE
+========================= */
 function animate() {
   requestAnimationFrame(animate);
+
+  if (stableGesture === "1 finger") mode = "text";
+  else mode = "idle";
+
+  const p = geo.attributes.position.array;
+
+  for (let i = 0; i < COUNT; i++) {
+    const i3 = i * 3;
+    let tx, ty, tz;
+
+    if (mode === "text" && i < textTargets.length) {
+      tx = textTargets[i].x;
+      ty = textTargets[i].y;
+      tz = textTargets[i].z;
+    } else {
+      tx = basePos[i3];
+      ty = basePos[i3+1];
+      tz = basePos[i3+2];
+    }
+
+    p[i3]     += (tx - p[i3]) * 0.08;
+    p[i3 + 1] += (ty - p[i3 + 1]) * 0.08;
+    p[i3 + 2] += (tz - p[i3 + 2]) * 0.08;
+  }
+
+  geo.attributes.position.needsUpdate = true;
   renderer.render(scene, camera3D);
 }
 animate();
