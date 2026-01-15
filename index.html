@@ -1,241 +1,276 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<meta name="screen-orientation" content="portrait">
-<meta name="orientation" content="portrait">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>Dear Laily</title>
 
 <style>
 html,body{
   margin:0;
   padding:0;
-  background:#000;
   overflow:hidden;
-  touch-action:none;
-  font-family:Georgia,serif;
+  background:#000;
+  font-family: serif;
 }
-canvas{position:fixed;inset:0}
-#cameraBox{
+canvas{
   position:fixed;
-  bottom:12px;right:12px;
-  width:110px;aspect-ratio:3/4;
+  top:0;left:0;
+}
+#camBox{
+  position:fixed;
+  bottom:12px;
+  right:12px;
+  width:120px;
+  height:160px;
+  border:2px solid rgba(255,255,255,.4);
   border-radius:12px;
   overflow:hidden;
-  border:1px solid rgba(255,255,255,.35);
-  z-index:10;background:#000
+  backdrop-filter: blur(6px);
+  z-index:10;
 }
-#cameraBox video{
-  width:100%;height:100%;
+video{
+  width:100%;
+  height:100%;
   object-fit:cover;
-  transform:scaleX(-1);
+  transform: scaleX(-1);
 }
 #hint{
   position:fixed;
-  top:10px;left:50%;
-  transform:translateX(-50%);
-  color:#fff;opacity:.6;
-  font-size:clamp(12px,3vw,15px);
-  z-index:10
+  top:10px;
+  width:100%;
+  text-align:center;
+  color:#bbb;
+  font-size:12px;
+  z-index:10;
 }
 </style>
 </head>
-
 <body>
-<div id="hint">Arahkan tangan ke tengah kamera</div>
-<div id="cameraBox"><video id="video" autoplay playsinline></video></div>
-<canvas id="c"></canvas>
 
+<div id="hint">Letakkan tangan di tengah kamera</div>
+<div id="camBox"><video id="video" autoplay playsinline></video></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-/* ================= CANVAS ================= */
-const canvas=c;
-const ctx=canvas.getContext("2d");
-function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
-resize();addEventListener("resize",resize);
+// ================= SCENE =================
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(
+  55,
+  innerWidth/innerHeight,
+  0.1,
+  1000
+);
+camera.position.z = innerWidth < 768 ? 52 : 42;
 
-/* ================= STATE ================= */
-let currentState="idle";
-let lastHandTime=Date.now();
-let restarting=false;
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
 
-/* ================= PARTICLES ================= */
-const COUNT=2600;
-const particles=[],base=[];
+// ================= PARTICLES =================
+const COUNT = 2400;
+const geo = new THREE.BufferGeometry();
+const pos = [];
+const colors = [];
+
+const palette = [
+  [1,1,1],
+  [0.6,0.8,1],
+  [0.8,0.6,1],
+  [1,0.7,0.9]
+];
+
 for(let i=0;i<COUNT;i++){
-  const p={
-    x:(Math.random()-.5)*canvas.width,
-    y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*800
-  };
-  particles.push(p);base.push({...p});
+  pos.push(
+    (Math.random()-0.5)*120,
+    (Math.random()-0.5)*120,
+    (Math.random()-0.5)*120
+  );
+  const c = palette[Math.floor(Math.random()*palette.length)];
+  colors.push(c[0],c[1],c[2]);
 }
 
-/* ================= TEXT ================= */
+geo.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+geo.setAttribute("color", new THREE.Float32BufferAttribute(colors,3));
+
+const mat = new THREE.PointsMaterial({
+  size:0.7,
+  vertexColors:true,
+  transparent:true,
+  opacity:0.9,
+  depthWrite:false
+});
+
+const stars = new THREE.Points(geo, mat);
+scene.add(stars);
+
+// ================= TEXT GENERATOR =================
 function makeText(text){
-  const off=document.createElement("canvas");
-  const octx=off.getContext("2d");
-  off.width=canvas.width;off.height=canvas.height;
+  const isMobile = innerWidth < 768;
+  const c = document.createElement("canvas");
+  c.width = isMobile ? 520 : 800;
+  c.height = isMobile ? 520 : 400;
 
-  const portrait=canvas.height>canvas.width;
-  const fontSize=portrait?canvas.width*0.065:canvas.width*0.045;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle="white";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  const fontSize = isMobile ? 28 : 46;
+  ctx.font = `${fontSize}px serif`;
 
-  octx.fillStyle="#fff";
-  octx.textAlign="center";
-  octx.textBaseline="middle";
-  octx.font=`600 ${fontSize}px Georgia`;
+  const words=text.split(" ");
+  let line="", lines=[];
+  const maxW=c.width*0.85;
 
-  const lines=text.split("\n");
-  const lh=fontSize*1.45;
-  const sy=off.height/2-(lines.length-1)*lh/2;
-  lines.forEach((l,i)=>octx.fillText(l,off.width/2,sy+i*lh));
+  words.forEach(w=>{
+    const t=line+w+" ";
+    if(ctx.measureText(t).width>maxW){
+      lines.push(line);
+      line=w+" ";
+    }else line=t;
+  });
+  lines.push(line);
 
-  const img=octx.getImageData(0,0,off.width,off.height).data;
-  const arr=[],step=portrait?3:4;
-  for(let y=0;y<off.height;y+=step){
-    for(let x=0;x<off.width;x+=step){
-      if(img[(y*off.width+x)*4+3]>120){
-        arr.push({x:x-off.width/2,y:y-off.height/2,z:0});
+  const lh=fontSize*1.4;
+  const startY=c.height/2-(lines.length-1)*lh/2;
+  lines.forEach((l,i)=>{
+    ctx.fillText(l.trim(),c.width/2,startY+i*lh);
+  });
+
+  const data=ctx.getImageData(0,0,c.width,c.height).data;
+  const arr=[];
+  const scale=isMobile?0.18:0.22;
+
+  for(let y=0;y<c.height;y+=3){
+    for(let x=0;x<c.width;x+=3){
+      if(data[(y*c.width+x)*4+3]>150){
+        arr.push({
+          x:(x-c.width/2)*scale,
+          y:(c.height/2-y)*scale,
+          z:0
+        });
       }
     }
   }
   return arr;
 }
 
-/* ================= HEART ================= */
-function makeHeart(){
-  const arr=[];
-  for(let t=0;t<Math.PI*2;t+=0.04){
-    const x=16*Math.pow(Math.sin(t),3);
-    const y=13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
-    arr.push({x:x*12,y:-y*12,z:0});
-  }
-  return arr;
+// ================= TARGETS =================
+const idleTargets = pos.map((_,i)=>({
+  x:pos[i*3],y:pos[i*3+1],z:pos[i*3+2]
+}));
+
+let targets = idleTargets;
+
+// ================= GESTURE LOCK =================
+let lastGesture=null;
+let currentGesture=null;
+let gestureStart=0;
+const HOLD=600;
+
+function setIdle(){
+  targets = idleTargets;
+  currentGesture=null;
 }
 
-/* ================= TARGETS ================= */
-const TARGETS={
-  fist: makeText(`from: Raja Iblis`),
+// ================= TRIGGER =================
+function triggerGesture(g){
+  if(g==="fist"){
+    targets = makeText("from: Raja Iblis");
+  }
+  if(g===1){
+    targets = makeText("Dear Laily Aliyah I want to sincerely apologize for the situation that happened");
+  }
+  if(g===2){
+    targets = makeText("I never intended to deceive you or break your trust in any way");
+  }
+  if(g===3){
+    targets = makeText("I’m really sorry for the misunderstanding");
+  }
+  if(g===4){
+    targets = makeText("♥");
+  }
+  if(g===5){
+    targets = makeText("ilysm ly ♥");
+  }
+}
 
-  one: makeText(
-`Dear Laily Aliyah,
+// ================= MEDIAPIPE =================
+const video=document.getElementById("video");
 
-I want to sincerely apologize
-for the situation that happened.`),
+const hands=new Hands({
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+hands.setOptions({
+  maxNumHands:1,
+  modelComplexity:1,
+  minDetectionConfidence:0.7,
+  minTrackingConfidence:0.7
+});
 
-  two: makeText(
-`I respect your feelings
-and I never intended to deceive you.`),
+hands.onResults(res=>{
+  if(!res.multiHandLandmarks){
+    lastGesture=null;
+    gestureStart=0;
+    setIdle();
+    return;
+  }
 
-  three: makeText(
-`I’m really sorry
-for the misunderstanding.`),
-
-  four: makeHeart(),
-
-  five: makeText(`ilysm ly ♥`)
-};
-
-/* ================= ANIMATE ================= */
-function animate(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.translate(canvas.width/2,canvas.height/2);
-
-  const target=TARGETS[currentState];
-  particles.forEach((p,i)=>{
-    let tx=base[i].x,ty=base[i].y,tz=base[i].z;
-    if(target&&i<target.length){
-      tx=target[i].x;ty=target[i].y;tz=0;
-    }
-    p.x+=(tx-p.x)*0.085;
-    p.y+=(ty-p.y)*0.085;
-    p.z+=(tz-p.z)*0.085;
-
-    const s=600/(600+p.z);
-    ctx.beginPath();
-    ctx.arc(p.x*s,p.y*s,1.4*s,0,Math.PI*2);
-    ctx.fillStyle="rgba(255,255,255,0.9)";
-    ctx.fill();
+  const lm=res.multiHandLandmarks[0];
+  const tips=[8,12,16,20];
+  let count=0;
+  tips.forEach(i=>{
+    if(lm[i].y < lm[i-2].y) count++;
   });
 
-  ctx.setTransform(1,0,0,1,0,0);
+  let g = count===0 ? "fist" : count;
+  const now=Date.now();
+
+  if(g!==lastGesture){
+    lastGesture=g;
+    gestureStart=now;
+    return;
+  }
+
+  if(currentGesture!==g && now-gestureStart>HOLD){
+    currentGesture=g;
+    triggerGesture(g);
+  }
+});
+
+const cam=new Camera(video,{
+  onFrame:async()=>{ await hands.send({image:video}); },
+  width:360,
+  height:480
+});
+cam.start();
+
+// ================= ANIMATION =================
+function animate(){
   requestAnimationFrame(animate);
+  const p=geo.attributes.position.array;
+
+  for(let i=0;i<COUNT;i++){
+    const t=targets[i%targets.length];
+    p[i*3]+= (t.x-p[i*3]) * 0.08;
+    p[i*3+1]+= (t.y-p[i*3+1]) * 0.08;
+    p[i*3+2]+= (t.z-p[i*3+2]) * 0.08;
+  }
+  geo.attributes.position.needsUpdate=true;
+  stars.rotation.y+=0.0006;
+  renderer.render(scene,camera);
 }
 animate();
 
-/* ================= MEDIAPIPE ================= */
-const video=document.getElementById("video");
-let camera,hands;
-
-function initHands(){
-  hands=new Hands({
-    locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-  });
-  hands.setOptions({
-    maxNumHands:1,
-    modelComplexity:1,
-    minDetectionConfidence:0.6,
-    minTrackingConfidence:0.6
-  });
-
-  hands.onResults(res=>{
-    if(!res.multiHandLandmarks){
-      currentState="idle";
-      return;
-    }
-
-    lastHandTime=Date.now();
-    const lm=res.multiHandLandmarks[0];
-
-    let fingers=0;
-    const tips=[8,12,16,20];
-    tips.forEach(t=>{
-      if(lm[t].y<lm[t-2].y) fingers++;
-    });
-    if(lm[4].x<lm[3].x) fingers++;
-
-    fingers=Math.max(0,Math.min(5,fingers)); // CLAMP
-
-    if(fingers===0) currentState="fist";
-    else if(fingers===1) currentState="one";
-    else if(fingers===2) currentState="two";
-    else if(fingers===3) currentState="three";
-    else if(fingers===4) currentState="four";
-    else if(fingers===5) currentState="five";
-  });
-}
-
-function startCamera(){
-  camera=new Camera(video,{
-    onFrame:async()=>{await hands.send({image:video});},
-    width:360,height:480
-  });
-  camera.start();
-}
-
-function restartPipeline(){
-  if(restarting) return;
-  restarting=true;
-  camera.stop();
-  setTimeout(()=>{
-    initHands();
-    startCamera();
-    restarting=false;
-  },400);
-}
-
-setInterval(()=>{
-  if(Date.now()-lastHandTime>1200){
-    restartPipeline();
-    lastHandTime=Date.now();
-  }
-},500);
-
-initHands();
-startCamera();
+window.addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
 </script>
 </body>
 </html>
