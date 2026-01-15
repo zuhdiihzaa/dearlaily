@@ -2,17 +2,20 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="screen-orientation" content="portrait">
+<meta name="orientation" content="portrait">
+
 <title>Dear Laily</title>
 
 <style>
 html,body{
   margin:0;
   padding:0;
-  background:black;
+  background:#000;
   overflow:hidden;
   touch-action:none;
-  font-family:'Georgia',serif;
+  font-family:Georgia,serif;
 }
 
 canvas{
@@ -28,28 +31,27 @@ canvas{
   aspect-ratio:3/4;
   border-radius:12px;
   overflow:hidden;
-  border:1px solid rgba(255,255,255,.3);
-  background:#000;
+  border:1px solid rgba(255,255,255,.35);
   z-index:10;
+  background:#000;
 }
 
 #cameraBox video{
   width:100%;
   height:100%;
   object-fit:cover;
-  transform:none;
+  transform:scaleX(-1); /* MIRROR ON */
 }
 
 #hint{
   position:fixed;
-  top:12px;
+  top:10px;
   left:50%;
   transform:translateX(-50%);
   color:#fff;
-  font-size:clamp(12px,3vw,16px);
   opacity:.6;
+  font-size:clamp(12px,3vw,15px);
   z-index:10;
-  text-align:center;
 }
 </style>
 </head>
@@ -64,25 +66,22 @@ canvas{
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-/* ================= CORE ================= */
+/* ================= CANVAS ================= */
 const canvas=document.getElementById("c");
 const ctx=canvas.getContext("2d");
-resize();
-window.onresize=resize;
 
 function resize(){
   canvas.width=innerWidth;
   canvas.height=innerHeight;
 }
-
-const DPR=window.devicePixelRatio||1;
+resize();
+addEventListener("resize",resize);
 
 /* ================= STATE ================= */
 let currentState="idle";
-let handVisible=false;
 
 /* ================= PARTICLES ================= */
-const COUNT=1800;
+const COUNT=2600;
 const particles=[];
 const base=[];
 
@@ -90,8 +89,7 @@ for(let i=0;i<COUNT;i++){
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*800,
-    tx:0,ty:0,tz:0
+    z:Math.random()*800
   };
   particles.push(p);
   base.push({...p});
@@ -102,25 +100,34 @@ function makeText(text){
   const off=document.createElement("canvas");
   const octx=off.getContext("2d");
 
-  const size=Math.min(canvas.width*0.08,canvas.height*0.1);
   off.width=canvas.width;
   off.height=canvas.height;
+
+  const portrait=canvas.height>canvas.width;
+  const fontSize=portrait
+    ? canvas.width*0.065
+    : canvas.width*0.045;
 
   octx.fillStyle="#fff";
   octx.textAlign="center";
   octx.textBaseline="middle";
-  octx.font=`${size}px Georgia`;
+  octx.font=`600 ${fontSize}px Georgia`;
 
   const lines=text.split("\n");
+  const lineHeight=fontSize*1.45;
+  const startY=off.height/2-(lines.length-1)*lineHeight/2;
+
   lines.forEach((l,i)=>{
-    octx.fillText(l,off.width/2,off.height/2+i*size*1.1);
+    octx.fillText(l,off.width/2,startY+i*lineHeight);
   });
 
   const img=octx.getImageData(0,0,off.width,off.height).data;
   const arr=[];
-  for(let y=0;y<off.height;y+=4){
-    for(let x=0;x<off.width;x+=4){
-      if(img[(y*off.width+x)*4+3]>100){
+  const step=portrait?3:4;
+
+  for(let y=0;y<off.height;y+=step){
+    for(let x=0;x<off.width;x+=step){
+      if(img[(y*off.width+x)*4+3]>120){
         arr.push({
           x:x-off.width/2,
           y:y-off.height/2,
@@ -145,25 +152,19 @@ function makeHeart(){
 
 /* ================= TARGETS ================= */
 const TARGETS={
-  one:makeText(
-`Dear Laily Aliyah,
+  one:makeText(`Dear Laily Aliyah,
 
 I want to sincerely apologize
 for the situation that happened.`),
 
-  two:makeText(
-`I never intended to deceive you.
-I respect your feelings
-and hope you can believe me.`),
+  two:makeText(`I never intended to deceive you.
+I respect your feelings.`),
 
-  three:makeText(
-`I’m really sorry for
-the misunderstanding.`),
+  three:makeText(`I’m really sorry
+for the misunderstanding.`),
 
   four:makeHeart(),
-
   five:makeText(`ilysm ly ♥`),
-
   fist:makeText(`from: Raja Iblis`)
 };
 
@@ -183,16 +184,13 @@ function animate(){
       tz=0;
     }
 
-    p.x+=(tx-p.x)*0.08;
-    p.y+=(ty-p.y)*0.08;
-    p.z+=(tz-p.z)*0.08;
+    p.x+=(tx-p.x)*0.085;
+    p.y+=(ty-p.y)*0.085;
+    p.z+=(tz-p.z)*0.085;
 
     const scale=600/(600+p.z);
-    const x=p.x*scale;
-    const y=p.y*scale;
-
     ctx.beginPath();
-    ctx.arc(x,y,1.2*scale,0,Math.PI*2);
+    ctx.arc(p.x*scale,p.y*scale,1.4*scale,0,Math.PI*2);
     ctx.fillStyle="rgba(255,255,255,0.9)";
     ctx.fill();
   });
@@ -211,26 +209,26 @@ const hands=new Hands({
 hands.setOptions({
   maxNumHands:1,
   modelComplexity:1,
-  minDetectionConfidence:.6,
-  minTrackingConfidence:.6
+  minDetectionConfidence:0.6,
+  minTrackingConfidence:0.6
 });
 
 hands.onResults(res=>{
   if(!res.multiHandLandmarks){
-    handVisible=false;
     currentState="idle";
     return;
   }
 
-  handVisible=true;
   const lm=res.multiHandLandmarks[0];
-
   let fingers=0;
   const tips=[8,12,16,20];
+
   tips.forEach(t=>{
     if(lm[t].y<lm[t-2].y) fingers++;
   });
-  if(lm[4].x>lm[3].x) fingers++;
+
+  /* THUMB LOGIC – MIRROR FIX */
+  if(lm[4].x < lm[3].x) fingers++;
 
   if(fingers===0) currentState="fist";
   else if(fingers===1) currentState="one";
