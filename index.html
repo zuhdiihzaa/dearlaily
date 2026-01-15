@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Dear Laily – Phase Stable</title>
+<title>Dear Laily</title>
 
 <style>
 html,body{
@@ -43,7 +43,7 @@ video{
 
 <body>
 <div id="camBox">
-  <video id="video" autoplay playsinline></video>
+  <video id="video" autoplay playsinline muted></video>
 </div>
 <div id="status">idle</div>
 
@@ -56,8 +56,8 @@ video{
    THREE SCENE
 ===================== */
 const scene = new THREE.Scene();
-const cam = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
-cam.position.z = 60;
+const cam3D = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+cam3D.position.z = 60;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
@@ -67,18 +67,18 @@ document.body.appendChild(renderer.domElement);
 /* =====================
    ROUND STAR TEXTURE
 ===================== */
-const starC = document.createElement("canvas");
-starC.width = starC.height = 64;
-const s = starC.getContext("2d");
-const g = s.createRadialGradient(32,32,2,32,32,32);
-g.addColorStop(0,"white");
-g.addColorStop(1,"transparent");
-s.fillStyle=g;
-s.beginPath();
-s.arc(32,32,32,0,Math.PI*2);
-s.fill();
+const starCanvas = document.createElement("canvas");
+starCanvas.width = starCanvas.height = 64;
+const sctx = starCanvas.getContext("2d");
+const grad = sctx.createRadialGradient(32,32,2,32,32,32);
+grad.addColorStop(0,"white");
+grad.addColorStop(1,"transparent");
+sctx.fillStyle = grad;
+sctx.beginPath();
+sctx.arc(32,32,32,0,Math.PI*2);
+sctx.fill();
 
-const starTex = new THREE.CanvasTexture(starC);
+const starTexture = new THREE.CanvasTexture(starCanvas);
 
 /* =====================
    STARS
@@ -93,15 +93,15 @@ for(let i=0;i<COUNT;i++){
   pos[i3]=(Math.random()-0.5)*120;
   pos[i3+1]=(Math.random()-0.5)*120;
   pos[i3+2]=(Math.random()-0.5)*120;
-  base.set(pos.slice(i3,i3+3),i3);
+  base.set(pos.slice(i3,i3+3), i3);
 }
 geo.setAttribute("position", new THREE.BufferAttribute(pos,3));
 
 const mat = new THREE.PointsMaterial({
-  map:starTex,
+  map:starTexture,
   transparent:true,
-  size:0.9,
-  depthWrite:false
+  depthWrite:false,
+  size:0.9
 });
 
 const stars = new THREE.Points(geo,mat);
@@ -110,36 +110,36 @@ scene.add(stars);
 /* =====================
    TEXT TARGET
 ===================== */
-function textTargets(text){
+function buildText(text){
   const c=document.createElement("canvas");
   c.width=900;c.height=250;
-  const x=c.getContext("2d");
-  x.fillStyle="white";
-  x.font="72px serif";
-  x.textAlign="center";
-  x.fillText(text,c.width/2,c.height/2+25);
-  const d=x.getImageData(0,0,c.width,c.height).data;
+  const ctx=c.getContext("2d");
+  ctx.fillStyle="white";
+  ctx.font="72px serif";
+  ctx.textAlign="center";
+  ctx.fillText(text,c.width/2,c.height/2+25);
+  const d=ctx.getImageData(0,0,c.width,c.height).data;
   const t=[];
   for(let y=0;y<c.height;y+=4){
-    for(let x2=0;x2<c.width;x2+=4){
-      if(d[(y*c.width+x2)*4+3]>150){
-        t.push({x:(x2-c.width/2)*0.35,y:(c.height/2-y)*0.35,z:0});
+    for(let x=0;x<c.width;x+=4){
+      if(d[(y*c.width+x)*4+3]>150){
+        t.push({x:(x-c.width/2)*0.35,y:(c.height/2-y)*0.35,z:0});
       }
     }
   }
   return t;
 }
 
-const TARGET = textTargets("Dear Laily");
-let show=false;
+const TARGET = buildText("Dear Laily");
+let showText = false;
 
 /* =====================
-   MEDIAPIPE HANDS (FIX)
+   MEDIAPIPE HANDS
 ===================== */
-const video=document.getElementById("video");
-const status=document.getElementById("status");
+const video = document.getElementById("video");
+const status = document.getElementById("status");
 
-const hands=new Hands({
+const hands = new Hands({
   locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 hands.setOptions({
@@ -149,29 +149,42 @@ hands.setOptions({
   minTrackingConfidence:0.7
 });
 
-let lastSeen=0;
+let lastSeen = 0;
 
-hands.onResults(r=>{
-  if(r.multiHandLandmarks){
-    lastSeen=performance.now();
-    status.textContent="detecting";
+hands.onResults(res=>{
+  if(res.multiHandLandmarks){
+    lastSeen = performance.now();
+    status.textContent = "detecting";
 
-    const lm=r.multiHandLandmarks[0];
-    const up=(t,p)=>lm[t].y<lm[p].y;
-    let fingers=0;
+    const lm = res.multiHandLandmarks[0];
+    const up = (t,p)=>lm[t].y < lm[p].y;
+    let fingers = 0;
     if(up(8,6))fingers++;
     if(up(12,10))fingers++;
     if(up(16,14))fingers++;
     if(up(20,18))fingers++;
 
-    show = (fingers===1);
+    showText = (fingers === 1);
   }
 });
 
-/* CAMERA START (STABLE) */
+/* =====================
+   CAMERA (MOBILE SAFE)
+===================== */
+let processing=false;
+let lastFrame=0;
+const FRAME_INTERVAL=80; // ~12fps
+
 const camUtil = new Camera(video,{
   onFrame: async ()=>{
+    const now = performance.now();
+    if(processing) return;
+    if(now-lastFrame<FRAME_INTERVAL) return;
+
+    processing=true;
+    lastFrame=now;
     await hands.send({image:video});
+    processing=false;
   },
   width:640,
   height:640
@@ -186,14 +199,14 @@ function animate(){
 
   if(performance.now()-lastSeen>1200){
     status.textContent="idle";
-    show=false;
+    showText=false;
   }
 
   const p=geo.attributes.position.array;
   for(let i=0;i<COUNT;i++){
     const i3=i*3;
     let tx,ty,tz;
-    if(show && i<TARGET.length){
+    if(showText && i<TARGET.length){
       ({x:tx,y:ty,z:tz}=TARGET[i]);
     }else{
       tx=base[i3];ty=base[i3+1];tz=base[i3+2];
@@ -203,7 +216,7 @@ function animate(){
     p[i3+2]+= (tz-p[i3+2])*0.08;
   }
   geo.attributes.position.needsUpdate=true;
-  renderer.render(scene,cam);
+  renderer.render(scene,cam3D);
 }
 animate();
 </script>
