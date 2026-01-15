@@ -36,6 +36,7 @@ video{
   width:100%;
   height:100%;
   object-fit:cover;
+  transform: scaleX(1); /* ❗️TIDAK MIRROR */
 }
 </style>
 </head>
@@ -154,7 +155,7 @@ hands.setOptions({
   minTrackingConfidence:0.7
 });
 
-let lastGesture="none", startTime=0;
+let lastCount=-1, startTime=0;
 const HOLD=700;
 
 hands.onResults(r=>{
@@ -174,8 +175,8 @@ hands.onResults(r=>{
   if(up(20,18))count++;
 
   const now=performance.now();
-  if(count!==lastGesture){
-    lastGesture=count;
+  if(count!==lastCount){
+    lastCount=count;
     startTime=now;
   }else if(now-startTime>HOLD){
     showText = (count===1);
@@ -217,12 +218,6 @@ function animate(){
   renderer.render(scene,camera3D);
 }
 animate();
-
-window.addEventListener("resize",()=>{
-  camera3D.aspect=innerWidth/innerHeight;
-  camera3D.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
 </script>
 </body>
 </html>
