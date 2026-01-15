@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Dear Laily</title>
 
 <style>
@@ -33,7 +33,7 @@ canvas{position:fixed;inset:0}
   position:fixed;
   top:10px;left:50%;
   transform:translateX(-50%);
-  color:#fff;opacity:.5;
+  color:#fff;opacity:.6;
   font-size:14px;
   z-index:10
 }
@@ -50,33 +50,14 @@ canvas{position:fixed;inset:0}
 
 <script>
 /* ================= CANVAS ================= */
-const canvas=c, ctx=canvas.getContext("2d");
+const canvas=c;
+const ctx=canvas.getContext("2d");
 function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
 resize();addEventListener("resize",resize);
 
 /* ================= STATE ================= */
 let currentState="idle";
 let lastHandTime=Date.now();
-
-/* ================= GALAXY (OPTIMIZED) ================= */
-let gT=0;
-function drawGalaxy(){
-  gT+=0.0015;
-  ctx.fillStyle="#000";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  const x=canvas.width/2+Math.sin(gT)*120;
-  const y=canvas.height/2+Math.cos(gT*0.7)*120;
-  const r=canvas.width*0.9;
-
-  const grad=ctx.createRadialGradient(x,y,0,x,y,r);
-  grad.addColorStop(0,"rgba(80,60,150,0.08)");
-  grad.addColorStop(0.5,"rgba(30,20,70,0.15)");
-  grad.addColorStop(1,"#000");
-
-  ctx.fillStyle=grad;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-}
 
 /* ================= PARTICLES ================= */
 const COUNT=2600;
@@ -85,32 +66,40 @@ for(let i=0;i<COUNT;i++){
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*900,
+    z:Math.random()*800,
     hue:200+Math.random()*120
   };
-  particles.push(p);base.push({...p});
+  particles.push(p);
+  base.push({...p});
 }
 
 /* ================= TEXT ================= */
 function makeText(text){
   const off=document.createElement("canvas");
   const octx=off.getContext("2d");
-  off.width=canvas.width;off.height=canvas.height;
-  const fs=canvas.width*(canvas.height>canvas.width?0.065:0.045);
-  octx.font=`600 ${fs}px Georgia`;
+  off.width=canvas.width;
+  off.height=canvas.height;
+
+  const portrait=canvas.height>canvas.width;
+  const fontSize=portrait?canvas.width*0.065:canvas.width*0.045;
+
   octx.fillStyle="#fff";
   octx.textAlign="center";
   octx.textBaseline="middle";
+  octx.font=`600 ${fontSize}px Georgia`;
+
   const lines=text.split("\n");
-  const lh=fs*1.45;
+  const lh=fontSize*1.45;
   const sy=off.height/2-(lines.length-1)*lh/2;
   lines.forEach((l,i)=>octx.fillText(l,off.width/2,sy+i*lh));
+
   const img=octx.getImageData(0,0,off.width,off.height).data;
   const arr=[];
   for(let y=0;y<off.height;y+=3){
     for(let x=0;x<off.width;x+=3){
-      if(img[(y*off.width+x)*4+3]>120)
+      if(img[(y*off.width+x)*4+3]>120){
         arr.push({x:x-off.width/2,y:y-off.height/2,z:0});
+      }
     }
   }
   return arr;
@@ -119,9 +108,9 @@ function makeText(text){
 /* ================= HEART ================= */
 function makeHeart(){
   const arr=[];
-  for(let a=0;a<Math.PI*2;a+=0.04){
-    const x=16*Math.pow(Math.sin(a),3);
-    const y=13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a);
+  for(let t=0;t<Math.PI*2;t+=0.04){
+    const x=16*Math.pow(Math.sin(t),3);
+    const y=13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
     arr.push({x:x*12,y:-y*12,z:0});
   }
   return arr;
@@ -142,67 +131,66 @@ for the misunderstanding.`),
   five: makeText("ilysm ly ♥")
 };
 
-/* ================= ANIMATE ================= */
+/* ================= ANIMATE (ASLI) ================= */
 function animate(){
-  drawGalaxy();
-  ctx.save();
+  ctx.fillStyle="rgba(0,0,0,0.35)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
   ctx.translate(canvas.width/2,canvas.height/2);
 
   const target=TARGETS[currentState];
-
   particles.forEach((p,i)=>{
     let tx=base[i].x,ty=base[i].y,tz=base[i].z;
-    let isText=false;
 
-    if(target&&i<target.length){
+    if(target && i<target.length){
       tx=target[i].x;
       ty=target[i].y;
       tz=0;
-      isText=true;
     }
 
     p.x+=(tx-p.x)*0.085;
     p.y+=(ty-p.y)*0.085;
     p.z+=(tz-p.z)*0.085;
 
-    const s=750/(750+p.z);
-
+    const s=600/(600+p.z);
     ctx.beginPath();
-    ctx.arc(p.x*s,p.y*s,isText?2.2*s:1.2*s,0,Math.PI*2);
-
-    if(isText){
-      ctx.shadowBlur=6;
-      ctx.shadowColor="rgba(255,255,255,0.6)";
-      ctx.fillStyle="#fff";
-    }else{
-      ctx.shadowBlur=0;
-      ctx.fillStyle=`hsla(${p.hue},70%,60%,0.3)`;
-    }
+    ctx.arc(p.x*s,p.y*s,1.4*s,0,Math.PI*2);
+    ctx.fillStyle=target && i<target.length
+      ? "rgba(255,255,255,0.95)"
+      : `hsla(${p.hue},60%,60%,0.35)`;
     ctx.fill();
   });
 
-  ctx.restore();
+  ctx.setTransform(1,0,0,1,0,0);
   requestAnimationFrame(animate);
 }
 animate();
 
-/* ================= MEDIAPIPE ================= */
+/* ================= MEDIAPIPE (ASLI) ================= */
 const video=document.getElementById("video");
-const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+const hands=new Hands({
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
 hands.setOptions({
   maxNumHands:1,
+  modelComplexity:1,
   minDetectionConfidence:0.6,
   minTrackingConfidence:0.6
 });
-
-hands.onResults(r=>{
-  if(!r.multiHandLandmarks){currentState="idle";return;}
+hands.onResults(res=>{
+  if(!res.multiHandLandmarks){
+    currentState="idle";
+    return;
+  }
   lastHandTime=Date.now();
-  const lm=r.multiHandLandmarks[0];
-  let f=0;
-  [8,12,16,20].forEach(t=>lm[t].y<lm[t-2].y&&f++);
-  if(lm[4].x<lm[3].x) f++;
-  currentState=["fist","one","two","three","four","five"][Math.min(5,f)];
+  const lm=res.multiHandLandmarks[0];
+  let fingers=0;
+  [8,12,16,20].forEach(t=>{
+    if(lm[t].y<lm[t-2].y) fingers++;
+  });
+  if(lm[4].x<lm[3].x) fingers++;
+  fingers=Math.max(0,Math.min(5,fingers));
+  currentState=["fist","one","two","three","four","five"][fingers];
 });
 
 const camera=new Camera(video,{
