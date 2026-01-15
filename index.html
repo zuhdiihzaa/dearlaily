@@ -59,40 +59,8 @@ resize();addEventListener("resize",resize);
 
 /* ================= STATE ================= */
 let currentState="idle";
-let prevState="idle";
 let lastHandTime=Date.now();
 let restarting=false;
-
-/* ================= TRANSITION ================= */
-let transition=1;
-const TRANSITION_SPEED=0.035;
-
-/* ================= PARALLAX ================= */
-let px=0,py=0,spx=0,spy=0;
-
-/* ================= IDLE ================= */
-let idleTime=0;
-
-/* ================= TEXT FLOW ================= */
-const TEXT_DELAY=0.0016;
-
-/* ================= NEBULA ================= */
-const nebula=document.createElement("canvas");
-const nctx=nebula.getContext("2d");
-function buildNebula(){
-  nebula.width=canvas.width;
-  nebula.height=canvas.height;
-  const g=nctx.createRadialGradient(
-    nebula.width*0.45,nebula.height*0.35,80,
-    nebula.width*0.5,nebula.height*0.5,nebula.width
-  );
-  g.addColorStop(0,"rgba(150,100,255,0.35)");
-  g.addColorStop(.5,"rgba(60,160,255,0.2)");
-  g.addColorStop(1,"rgba(0,0,0,0)");
-  nctx.fillStyle=g;
-  nctx.fillRect(0,0,nebula.width,nebula.height);
-}
-buildNebula();
 
 /* ================= PARTICLES ================= */
 const COUNT=2600;
@@ -101,8 +69,7 @@ for(let i=0;i<COUNT;i++){
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*900,
-    hue:200+Math.random()*80
+    z:Math.random()*800
   };
   particles.push(p);base.push({...p});
 }
@@ -111,7 +78,8 @@ for(let i=0;i<COUNT;i++){
 function makeText(text){
   const off=document.createElement("canvas");
   const octx=off.getContext("2d");
-  off.width=canvas.width;off.height=canvas.height;
+  off.width=canvas.width;
+  off.height=canvas.height;
 
   const portrait=canvas.height>canvas.width;
   const fontSize=portrait?canvas.width*0.065:canvas.width*0.045;
@@ -152,76 +120,51 @@ function makeHeart(){
 /* ================= TARGETS ================= */
 const TARGETS={
   fist: makeText(`from: Raja Iblis`),
-  one: makeText(`Dear Laily Aliyah,
+
+  one: makeText(
+`Dear Laily Aliyah,
 
 I want to sincerely apologize
 for the situation that happened.`),
-  two: makeText(`I respect your feelings
+
+  two: makeText(
+`I respect your feelings
 and I never intended to deceive you.`),
-  three: makeText(`I’m really sorry
+
+  three: makeText(
+`I’m really sorry
 for the misunderstanding.`),
+
   four: makeHeart(),
+
   five: makeText(`ilysm ly ♥`)
 };
 
 /* ================= ANIMATE ================= */
 function animate(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  idleTime+=0.002;
-
-  spx+=(px-spx)*0.04;
-  spy+=(py-spy)*0.04;
-  ctx.drawImage(nebula,spx*0.04,spy*0.04);
-
   ctx.translate(canvas.width/2,canvas.height/2);
 
   const target=TARGETS[currentState];
-  if(prevState!==currentState){
-    transition=0;
-    prevState=currentState;
-  }
-  transition=Math.min(1,transition+TRANSITION_SPEED);
-  const easeBase=transition*transition*(3-2*transition);
 
   particles.forEach((p,i)=>{
     let tx=base[i].x,ty=base[i].y,tz=base[i].z;
-    let localEase=1;
 
-    if(target&&i<target.length){
-      const delay=i*TEXT_DELAY;
-      localEase=Math.max(0,Math.min(1,(easeBase-delay)*1.8));
+    if(target && i<target.length){
       tx=target[i].x;
       ty=target[i].y;
-      tz=320*(1-localEase);
+      tz=0;
     }
 
+    // ❗ FIX UTAMA: easing TANPA delay
     p.x+=(tx-p.x)*0.085;
     p.y+=(ty-p.y)*0.085;
     p.z+=(tz-p.z)*0.085;
 
-    const s=700/(700+p.z);
-    let dx=p.x*s+spx*(p.z/900)*0.15;
-    let dy=p.y*s+spy*(p.z/900)*0.15;
-
-    let breath=1,ox=0,oy=0;
-    if(currentState==="idle"){
-      ox=Math.sin(idleTime+i*0.01)*0.6;
-      oy=Math.cos(idleTime+i*0.013)*0.6;
-      breath=1+Math.sin(idleTime+i*0.02)*0.03;
-    }
-    if(target&&i<target.length) breath*=0.4;
-
+    const s=600/(600+p.z);
     ctx.beginPath();
-    ctx.arc(dx+ox,dy+oy,1.4*s*breath,0,Math.PI*2);
-
-    if(target&&i<target.length){
-      ctx.fillStyle=`rgba(255,255,255,${0.25+0.75*localEase})`;
-      ctx.shadowBlur=12;
-      ctx.shadowColor="rgba(255,255,255,0.35)";
-    }else{
-      ctx.fillStyle=`hsla(${p.hue},80%,75%,0.9)`;
-      ctx.shadowBlur=0;
-    }
+    ctx.arc(p.x*s,p.y*s,1.4*s,0,Math.PI*2);
+    ctx.fillStyle="rgba(255,255,255,0.9)";
     ctx.fill();
   });
 
@@ -235,7 +178,9 @@ const video=document.getElementById("video");
 let camera,hands;
 
 function initHands(){
-  hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+  hands=new Hands({
+    locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  });
   hands.setOptions({
     maxNumHands:1,
     modelComplexity:1,
@@ -244,17 +189,29 @@ function initHands(){
   });
 
   hands.onResults(res=>{
-    if(!res.multiHandLandmarks){currentState="idle";return;}
+    if(!res.multiHandLandmarks){
+      currentState="idle";
+      return;
+    }
+
     lastHandTime=Date.now();
     const lm=res.multiHandLandmarks[0];
-    px=(lm[0].x-.5)*80;
-    py=(lm[0].y-.5)*80;
 
     let fingers=0;
-    [8,12,16,20].forEach(t=>{if(lm[t].y<lm[t-2].y)fingers++;});
-    if(lm[4].x<lm[3].x)fingers++;
+    const tips=[8,12,16,20];
+    tips.forEach(t=>{
+      if(lm[t].y<lm[t-2].y) fingers++;
+    });
+    if(lm[4].x<lm[3].x) fingers++;
+
     fingers=Math.max(0,Math.min(5,fingers));
-    currentState=["fist","one","two","three","four","five"][fingers];
+
+    if(fingers===0) currentState="fist";
+    else if(fingers===1) currentState="one";
+    else if(fingers===2) currentState="two";
+    else if(fingers===3) currentState="three";
+    else if(fingers===4) currentState="four";
+    else if(fingers===5) currentState="five";
   });
 }
 
@@ -267,10 +224,14 @@ function startCamera(){
 }
 
 function restartPipeline(){
-  if(restarting)return;
+  if(restarting) return;
   restarting=true;
   camera.stop();
-  setTimeout(()=>{initHands();startCamera();restarting=false;},400);
+  setTimeout(()=>{
+    initHands();
+    startCamera();
+    restarting=false;
+  },400);
 }
 
 setInterval(()=>{
