@@ -25,7 +25,7 @@ html,body{
   position:fixed;
   top:12px;
   right:12px;
-  width:150px;
+  width:140px;
   aspect-ratio:1/1;
   border-radius:14px;
   overflow:hidden;
@@ -36,7 +36,7 @@ video{
   width:100%;
   height:100%;
   object-fit:cover;
-  transform:scaleX(1); /* NOT MIRROR */
+  transform:scaleX(1); /* no mirror */
 }
 </style>
 </head>
@@ -53,11 +53,21 @@ video{
 
 <script>
 /* =====================
-   THREE SCENE
+   DEVICE DETECT
+===================== */
+const IS_MOBILE = innerWidth < 768;
+
+/* =====================
+   THREE
 ===================== */
 const scene = new THREE.Scene();
-const cam3D = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
-cam3D.position.z = 60;
+const cam3D = new THREE.PerspectiveCamera(
+  60,
+  innerWidth/innerHeight,
+  0.1,
+  1000
+);
+cam3D.position.z = IS_MOBILE ? 55 : 65;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
@@ -65,81 +75,88 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 document.body.appendChild(renderer.domElement);
 
 /* =====================
-   ROUND STAR TEXTURE
+   STAR TEXTURE (ROUND)
 ===================== */
-const starCanvas = document.createElement("canvas");
-starCanvas.width = starCanvas.height = 64;
-const sctx = starCanvas.getContext("2d");
-const grad = sctx.createRadialGradient(32,32,2,32,32,32);
-grad.addColorStop(0,"white");
-grad.addColorStop(1,"transparent");
-sctx.fillStyle = grad;
+const sc=document.createElement("canvas");
+sc.width=sc.height=64;
+const sctx=sc.getContext("2d");
+const g=sctx.createRadialGradient(32,32,2,32,32,32);
+g.addColorStop(0,"white");
+g.addColorStop(1,"transparent");
+sctx.fillStyle=g;
 sctx.beginPath();
 sctx.arc(32,32,32,0,Math.PI*2);
 sctx.fill();
 
-const starTexture = new THREE.CanvasTexture(starCanvas);
+const starTex=new THREE.CanvasTexture(sc);
 
 /* =====================
    STARS
 ===================== */
-const COUNT = 1500;
-const geo = new THREE.BufferGeometry();
-const pos = new Float32Array(COUNT*3);
-const base = new Float32Array(COUNT*3);
+const COUNT=1500;
+const geo=new THREE.BufferGeometry();
+const pos=new Float32Array(COUNT*3);
+const base=new Float32Array(COUNT*3);
 
 for(let i=0;i<COUNT;i++){
   const i3=i*3;
   pos[i3]=(Math.random()-0.5)*120;
   pos[i3+1]=(Math.random()-0.5)*120;
   pos[i3+2]=(Math.random()-0.5)*120;
-  base.set(pos.slice(i3,i3+3), i3);
+  base.set(pos.slice(i3,i3+3),i3);
 }
-geo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
 
-const mat = new THREE.PointsMaterial({
-  map:starTexture,
+const mat=new THREE.PointsMaterial({
+  map:starTex,
   transparent:true,
   depthWrite:false,
-  size:0.9
+  size:0.85
 });
-
-const stars = new THREE.Points(geo,mat);
+const stars=new THREE.Points(geo,mat);
 scene.add(stars);
 
 /* =====================
-   TEXT TARGET
+   RESPONSIVE TEXT TARGET
 ===================== */
 function buildText(text){
   const c=document.createElement("canvas");
-  c.width=900;c.height=250;
+  c.width=IS_MOBILE?700:900;
+  c.height=IS_MOBILE?200:260;
+
   const ctx=c.getContext("2d");
   ctx.fillStyle="white";
-  ctx.font="72px serif";
   ctx.textAlign="center";
-  ctx.fillText(text,c.width/2,c.height/2+25);
+  ctx.font=`${IS_MOBILE?48:72}px serif`;
+  ctx.fillText(text,c.width/2,c.height/2+20);
+
   const d=ctx.getImageData(0,0,c.width,c.height).data;
+  const scale=IS_MOBILE?0.28:0.35;
   const t=[];
   for(let y=0;y<c.height;y+=4){
     for(let x=0;x<c.width;x+=4){
       if(d[(y*c.width+x)*4+3]>150){
-        t.push({x:(x-c.width/2)*0.35,y:(c.height/2-y)*0.35,z:0});
+        t.push({
+          x:(x-c.width/2)*scale,
+          y:(c.height/2-y)*scale,
+          z:0
+        });
       }
     }
   }
   return t;
 }
 
-const TARGET = buildText("Dear Laily");
-let showText = false;
+const TARGET=buildText("Dear Laily");
+let showText=false;
 
 /* =====================
-   MEDIAPIPE HANDS
+   MEDIAPIPE
 ===================== */
-const video = document.getElementById("video");
-const status = document.getElementById("status");
+const video=document.getElementById("video");
+const status=document.getElementById("status");
 
-const hands = new Hands({
+const hands=new Hands({
   locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 hands.setOptions({
@@ -149,42 +166,48 @@ hands.setOptions({
   minTrackingConfidence:0.7
 });
 
-let lastSeen = 0;
+let lastSeen=0;
 
-hands.onResults(res=>{
-  if(res.multiHandLandmarks){
-    lastSeen = performance.now();
-    status.textContent = "detecting";
+hands.onResults(r=>{
+  if(r.multiHandLandmarks){
+    lastSeen=performance.now();
+    status.textContent="detecting";
 
-    const lm = res.multiHandLandmarks[0];
-    const up = (t,p)=>lm[t].y < lm[p].y;
-    let fingers = 0;
+    const lm=r.multiHandLandmarks[0];
+    const up=(t,p)=>lm[t].y<lm[p].y;
+    let fingers=0;
     if(up(8,6))fingers++;
     if(up(12,10))fingers++;
     if(up(16,14))fingers++;
     if(up(20,18))fingers++;
 
-    showText = (fingers === 1);
+    showText = (fingers===1);
   }
 });
 
 /* =====================
-   CAMERA (MOBILE SAFE)
+   CAMERA (ANTI FREEZE)
 ===================== */
 let processing=false;
 let lastFrame=0;
-const FRAME_INTERVAL=80; // ~12fps
+const FRAME_INTERVAL=80;
 
-const camUtil = new Camera(video,{
+const camUtil=new Camera(video,{
   onFrame: async ()=>{
-    const now = performance.now();
+    const now=performance.now();
     if(processing) return;
     if(now-lastFrame<FRAME_INTERVAL) return;
 
     processing=true;
     lastFrame=now;
-    await hands.send({image:video});
-    processing=false;
+
+    try{
+      await hands.send({image:video});
+    }catch(e){
+      console.warn("hands error",e);
+    }finally{
+      processing=false;
+    }
   },
   width:640,
   height:640
