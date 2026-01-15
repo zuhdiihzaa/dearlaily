@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="screen-orientation" content="portrait">
+<meta name="orientation" content="portrait">
 <title>Dear Laily</title>
 
 <style>
@@ -34,7 +36,7 @@ canvas{position:fixed;inset:0}
   top:10px;left:50%;
   transform:translateX(-50%);
   color:#fff;opacity:.6;
-  font-size:14px;
+  font-size:clamp(12px,3vw,15px);
   z-index:10
 }
 </style>
@@ -58,6 +60,7 @@ resize();addEventListener("resize",resize);
 /* ================= STATE ================= */
 let currentState="idle";
 let lastHandTime=Date.now();
+let restarting=false;
 
 /* ================= PARTICLES ================= */
 const COUNT=2600;
@@ -66,19 +69,16 @@ for(let i=0;i<COUNT;i++){
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*800,
-    hue:200+Math.random()*120
+    z:Math.random()*800
   };
-  particles.push(p);
-  base.push({...p});
+  particles.push(p);base.push({...p});
 }
 
 /* ================= TEXT ================= */
 function makeText(text){
   const off=document.createElement("canvas");
   const octx=off.getContext("2d");
-  off.width=canvas.width;
-  off.height=canvas.height;
+  off.width=canvas.width;off.height=canvas.height;
 
   const portrait=canvas.height>canvas.width;
   const fontSize=portrait?canvas.width*0.065:canvas.width*0.045;
@@ -94,9 +94,9 @@ function makeText(text){
   lines.forEach((l,i)=>octx.fillText(l,off.width/2,sy+i*lh));
 
   const img=octx.getImageData(0,0,off.width,off.height).data;
-  const arr=[];
-  for(let y=0;y<off.height;y+=3){
-    for(let x=0;x<off.width;x+=3){
+  const arr=[],step=portrait?3:4;
+  for(let y=0;y<off.height;y+=step){
+    for(let x=0;x<off.width;x+=step){
       if(img[(y*off.width+x)*4+3]>120){
         arr.push({x:x-off.width/2,y:y-off.height/2,z:0});
       }
@@ -118,36 +118,38 @@ function makeHeart(){
 
 /* ================= TARGETS ================= */
 const TARGETS={
-  fist: makeText("from: Raja Iblis"),
-  one: makeText(`Dear Laily Aliyah,
+  fist: makeText(`from: Raja Iblis`),
+
+  one: makeText(
+`Dear Laily Aliyah,
 
 I want to sincerely apologize
 for the situation that happened.`),
-  two: makeText(`I respect your feelings
+
+  two: makeText(
+`I respect your feelings
 and I never intended to deceive you.`),
-  three: makeText(`I’m really sorry
+
+  three: makeText(
+`I’m really sorry
 for the misunderstanding.`),
+
   four: makeHeart(),
-  five: makeText("ilysm ly ♥")
+
+  five: makeText(`ilysm ly ♥`)
 };
 
-/* ================= ANIMATE (ASLI) ================= */
+/* ================= ANIMATE ================= */
 function animate(){
-  ctx.fillStyle="rgba(0,0,0,0.35)";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.translate(canvas.width/2,canvas.height/2);
 
   const target=TARGETS[currentState];
   particles.forEach((p,i)=>{
     let tx=base[i].x,ty=base[i].y,tz=base[i].z;
-
-    if(target && i<target.length){
-      tx=target[i].x;
-      ty=target[i].y;
-      tz=0;
+    if(target&&i<target.length){
+      tx=target[i].x;ty=target[i].y;tz=0;
     }
-
     p.x+=(tx-p.x)*0.085;
     p.y+=(ty-p.y)*0.085;
     p.z+=(tz-p.z)*0.085;
@@ -155,9 +157,7 @@ function animate(){
     const s=600/(600+p.z);
     ctx.beginPath();
     ctx.arc(p.x*s,p.y*s,1.4*s,0,Math.PI*2);
-    ctx.fillStyle=target && i<target.length
-      ? "rgba(255,255,255,0.95)"
-      : `hsla(${p.hue},60%,60%,0.35)`;
+    ctx.fillStyle="rgba(255,255,255,0.9)";
     ctx.fill();
   });
 
@@ -166,38 +166,76 @@ function animate(){
 }
 animate();
 
-/* ================= MEDIAPIPE (ASLI) ================= */
+/* ================= MEDIAPIPE ================= */
 const video=document.getElementById("video");
-const hands=new Hands({
-  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
-hands.setOptions({
-  maxNumHands:1,
-  modelComplexity:1,
-  minDetectionConfidence:0.6,
-  minTrackingConfidence:0.6
-});
-hands.onResults(res=>{
-  if(!res.multiHandLandmarks){
-    currentState="idle";
-    return;
-  }
-  lastHandTime=Date.now();
-  const lm=res.multiHandLandmarks[0];
-  let fingers=0;
-  [8,12,16,20].forEach(t=>{
-    if(lm[t].y<lm[t-2].y) fingers++;
-  });
-  if(lm[4].x<lm[3].x) fingers++;
-  fingers=Math.max(0,Math.min(5,fingers));
-  currentState=["fist","one","two","three","four","five"][fingers];
-});
+let camera,hands;
 
-const camera=new Camera(video,{
-  onFrame:async()=>hands.send({image:video}),
-  width:360,height:480
-});
-camera.start();
+function initHands(){
+  hands=new Hands({
+    locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  });
+  hands.setOptions({
+    maxNumHands:1,
+    modelComplexity:1,
+    minDetectionConfidence:0.6,
+    minTrackingConfidence:0.6
+  });
+
+  hands.onResults(res=>{
+    if(!res.multiHandLandmarks){
+      currentState="idle";
+      return;
+    }
+
+    lastHandTime=Date.now();
+    const lm=res.multiHandLandmarks[0];
+
+    let fingers=0;
+    const tips=[8,12,16,20];
+    tips.forEach(t=>{
+      if(lm[t].y<lm[t-2].y) fingers++;
+    });
+    if(lm[4].x<lm[3].x) fingers++;
+
+    fingers=Math.max(0,Math.min(5,fingers));
+
+    if(fingers===0) currentState="fist";
+    else if(fingers===1) currentState="one";
+    else if(fingers===2) currentState="two";
+    else if(fingers===3) currentState="three";
+    else if(fingers===4) currentState="four";
+    else if(fingers===5) currentState="five";
+  });
+}
+
+function startCamera(){
+  camera=new Camera(video,{
+    onFrame:async()=>{await hands.send({image:video});},
+    width:360,height:480
+  });
+  camera.start();
+}
+
+function restartPipeline(){
+  if(restarting) return;
+  restarting=true;
+  camera.stop();
+  setTimeout(()=>{
+    initHands();
+    startCamera();
+    restarting=false;
+  },400);
+}
+
+setInterval(()=>{
+  if(Date.now()-lastHandTime>1200){
+    restartPipeline();
+    lastHandTime=Date.now();
+  }
+},500);
+
+initHands();
+startCamera();
 </script>
 </body>
 </html>
