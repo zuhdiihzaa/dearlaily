@@ -65,13 +65,23 @@ let restarting=false;
 /* ================= PARTICLES ================= */
 const COUNT=2600;
 const particles=[],base=[];
+const starColors=[
+  [255,255,255],
+  [180,210,255],
+  [200,170,255],
+  [255,180,220]
+];
+
 for(let i=0;i<COUNT;i++){
+  const c=starColors[Math.floor(Math.random()*starColors.length)];
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*800
+    z:Math.random()*800,
+    r:c[0],g:c[1],b:c[2]
   };
-  particles.push(p);base.push({...p});
+  particles.push(p);
+  base.push({...p});
 }
 
 /* ================= TEXT ================= */
@@ -111,9 +121,12 @@ function makeHeart(){
   for(let t=0;t<Math.PI*2;t+=0.04){
     const x=16*Math.pow(Math.sin(t),3);
     const y=13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
-    arr.push({x:x*12,y:-y*12,z:0});
-  }
-  return arr;
+    arr.push({
+  x:x-off.width/2,
+  y:y-off.height/2,
+  z:Math.random()*120
+});
+
 }
 
 /* ================= TARGETS ================= */
@@ -155,11 +168,19 @@ function animate(){
     p.z+=(tz-p.z)*0.085;
 
     const s=600/(600+p.z);
-    ctx.beginPath();
-    ctx.arc(p.x*s,p.y*s,1.4*s,0,Math.PI*2);
-    ctx.fillStyle="rgba(255,255,255,0.9)";
-    ctx.fill();
-  });
+ const glow = 0.15 + (1 - p.z / 800) * 0.5;
+const radius = (1.2 + glow) * s;
+
+ctx.beginPath();
+ctx.arc(p.x*s,p.y*s,radius,0,Math.PI*2);
+
+// depth-based light
+ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},${0.75 + glow})`;
+ctx.shadowBlur = 12 * glow;
+ctx.shadowColor = `rgba(${p.r},${p.g},${p.b},0.6)`;
+ctx.fill();
+ctx.shadowBlur = 0;
+
 
   ctx.setTransform(1,0,0,1,0,0);
   requestAnimationFrame(animate);
