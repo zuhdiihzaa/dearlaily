@@ -64,11 +64,17 @@ let lastHandTime=Date.now();
 let restarting=false;
 
 /* ================= TRANSITION ================= */
-let transition=1; // 0 → 1
+let transition=1;
 const TRANSITION_SPEED=0.035;
 
 /* ================= PARALLAX ================= */
 let px=0,py=0,spx=0,spy=0;
+
+/* ================= IDLE ================= */
+let idleTime=0;
+
+/* ================= TEXT FLOW ================= */
+const TEXT_DELAY=0.0016;
 
 /* ================= NEBULA ================= */
 const nebula=document.createElement("canvas");
@@ -77,11 +83,11 @@ function buildNebula(){
   nebula.width=canvas.width;
   nebula.height=canvas.height;
   const g=nctx.createRadialGradient(
-    nebula.width*0.4,nebula.height*0.35,80,
+    nebula.width*0.45,nebula.height*0.35,80,
     nebula.width*0.5,nebula.height*0.5,nebula.width
   );
-  g.addColorStop(0,"rgba(140,90,255,0.35)");
-  g.addColorStop(.5,"rgba(60,160,255,0.18)");
+  g.addColorStop(0,"rgba(150,100,255,0.35)");
+  g.addColorStop(.5,"rgba(60,160,255,0.2)");
   g.addColorStop(1,"rgba(0,0,0,0)");
   nctx.fillStyle=g;
   nctx.fillRect(0,0,nebula.width,nebula.height);
@@ -161,8 +167,8 @@ for the misunderstanding.`),
 /* ================= ANIMATE ================= */
 function animate(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  idleTime+=0.002;
 
-  // nebula
   spx+=(px-spx)*0.04;
   spy+=(py-spy)*0.04;
   ctx.drawImage(nebula,spx*0.04,spy*0.04);
@@ -175,14 +181,18 @@ function animate(){
     prevState=currentState;
   }
   transition=Math.min(1,transition+TRANSITION_SPEED);
-  const ease=transition*transition*(3-2*transition);
+  const easeBase=transition*transition*(3-2*transition);
 
   particles.forEach((p,i)=>{
     let tx=base[i].x,ty=base[i].y,tz=base[i].z;
+    let localEase=1;
+
     if(target&&i<target.length){
+      const delay=i*TEXT_DELAY;
+      localEase=Math.max(0,Math.min(1,(easeBase-delay)*1.8));
       tx=target[i].x;
       ty=target[i].y;
-      tz=300*(1-ease); // cinematic pull
+      tz=320*(1-localEase);
     }
 
     p.x+=(tx-p.x)*0.085;
@@ -190,14 +200,22 @@ function animate(){
     p.z+=(tz-p.z)*0.085;
 
     const s=700/(700+p.z);
-    const dx=p.x*s + spx*(p.z/900)*0.15;
-    const dy=p.y*s + spy*(p.z/900)*0.15;
+    let dx=p.x*s+spx*(p.z/900)*0.15;
+    let dy=p.y*s+spy*(p.z/900)*0.15;
+
+    let breath=1,ox=0,oy=0;
+    if(currentState==="idle"){
+      ox=Math.sin(idleTime+i*0.01)*0.6;
+      oy=Math.cos(idleTime+i*0.013)*0.6;
+      breath=1+Math.sin(idleTime+i*0.02)*0.03;
+    }
+    if(target&&i<target.length) breath*=0.4;
 
     ctx.beginPath();
-    ctx.arc(dx,dy,1.4*s,0,Math.PI*2);
+    ctx.arc(dx+ox,dy+oy,1.4*s*breath,0,Math.PI*2);
 
     if(target&&i<target.length){
-      ctx.fillStyle=`rgba(255,255,255,${0.3+0.7*ease})`;
+      ctx.fillStyle=`rgba(255,255,255,${0.25+0.75*localEase})`;
       ctx.shadowBlur=12;
       ctx.shadowColor="rgba(255,255,255,0.35)";
     }else{
@@ -217,9 +235,7 @@ const video=document.getElementById("video");
 let camera,hands;
 
 function initHands(){
-  hands=new Hands({
-    locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-  });
+  hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
   hands.setOptions({
     maxNumHands:1,
     modelComplexity:1,
@@ -228,19 +244,15 @@ function initHands(){
   });
 
   hands.onResults(res=>{
-    if(!res.multiHandLandmarks){
-      currentState="idle";
-      return;
-    }
+    if(!res.multiHandLandmarks){currentState="idle";return;}
     lastHandTime=Date.now();
     const lm=res.multiHandLandmarks[0];
     px=(lm[0].x-.5)*80;
     py=(lm[0].y-.5)*80;
 
     let fingers=0;
-    [8,12,16,20].forEach(t=>{ if(lm[t].y<lm[t-2].y) fingers++; });
-    if(lm[4].x<lm[3].x) fingers++;
-
+    [8,12,16,20].forEach(t=>{if(lm[t].y<lm[t-2].y)fingers++;});
+    if(lm[4].x<lm[3].x)fingers++;
     fingers=Math.max(0,Math.min(5,fingers));
     currentState=["fist","one","two","three","four","five"][fingers];
   });
@@ -255,14 +267,10 @@ function startCamera(){
 }
 
 function restartPipeline(){
-  if(restarting) return;
+  if(restarting)return;
   restarting=true;
   camera.stop();
-  setTimeout(()=>{
-    initHands();
-    startCamera();
-    restarting=false;
-  },400);
+  setTimeout(()=>{initHands();startCamera();restarting=false;},400);
 }
 
 setInterval(()=>{
