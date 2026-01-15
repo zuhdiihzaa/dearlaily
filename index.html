@@ -62,8 +62,8 @@ let currentState="idle";
 let lastHandTime=Date.now();
 let restarting=false;
 
-/* ================= PARTICLES ================= */
-const COUNT=2800;
+/* ================= PARTICLES (POLISHED) ================= */
+const COUNT=2600;
 const particles=[],base=[];
 const starColors=[
   [255,255,255],
@@ -73,26 +73,25 @@ const starColors=[
 ];
 
 for(let i=0;i<COUNT;i++){
-  const col=starColors[Math.floor(Math.random()*starColors.length)];
+  const c=starColors[Math.floor(Math.random()*starColors.length)];
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:Math.random()*900,
-    r:col[0],g:col[1],b:col[2]
+    z:Math.random()*800,
+    r:c[0],g:c[1],b:c[2]
   };
   particles.push(p);
   base.push({...p});
 }
 
-/* ================= TEXT ================= */
+/* ================= TEXT (3D FEEL) ================= */
 function makeText(text){
   const off=document.createElement("canvas");
   const octx=off.getContext("2d");
-  off.width=canvas.width;
-  off.height=canvas.height;
+  off.width=canvas.width;off.height=canvas.height;
 
   const portrait=canvas.height>canvas.width;
-  const fontSize=portrait?canvas.width*0.06:canvas.width*0.045;
+  const fontSize=portrait?canvas.width*0.065:canvas.width*0.045;
 
   octx.fillStyle="#fff";
   octx.textAlign="center";
@@ -105,16 +104,14 @@ function makeText(text){
   lines.forEach((l,i)=>octx.fillText(l,off.width/2,sy+i*lh));
 
   const img=octx.getImageData(0,0,off.width,off.height).data;
-  const arr=[];
-  const step=2; // density tinggi agar teks solid
-
+  const arr=[],step=portrait?3:4;
   for(let y=0;y<off.height;y+=step){
     for(let x=0;x<off.width;x+=step){
       if(img[(y*off.width+x)*4+3]>120){
         arr.push({
           x:x-off.width/2,
           y:y-off.height/2,
-          z:0 // TEKS FLAT → TERBACA
+          z:Math.random()*120
         });
       }
     }
@@ -125,10 +122,14 @@ function makeText(text){
 /* ================= HEART ================= */
 function makeHeart(){
   const arr=[];
-  for(let t=0;t<Math.PI*2;t+=0.035){
+  for(let t=0;t<Math.PI*2;t+=0.04){
     const x=16*Math.pow(Math.sin(t),3);
     const y=13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t);
-    arr.push({x:x*11,y:-y*11,z:0});
+    arr.push({
+      x:x*12,
+      y:-y*12,
+      z:Math.random()*80
+    });
   }
   return arr;
 }
@@ -156,20 +157,18 @@ for the misunderstanding.`),
   five: makeText(`ilysm ly ♥`)
 };
 
-/* ================= ANIMATE ================= */
+/* ================= ANIMATE (3D LOOK) ================= */
 function animate(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.translate(canvas.width/2,canvas.height/2);
 
   const target=TARGETS[currentState];
-
   particles.forEach((p,i)=>{
     let tx=base[i].x,ty=base[i].y,tz=base[i].z;
-
-    if(target && i<target.length){
+    if(target&&i<target.length){
       tx=target[i].x;
       ty=target[i].y;
-      tz=0;
+      tz=target[i].z||0;
     }
 
     p.x+=(tx-p.x)*0.085;
@@ -177,22 +176,16 @@ function animate(){
     p.z+=(tz-p.z)*0.085;
 
     const s=600/(600+p.z);
+    const glow=0.15+(1-p.z/800)*0.5;
+    const radius=(1.2+glow)*s;
 
     ctx.beginPath();
-    ctx.arc(p.x*s,p.y*s,1.35*s,0,Math.PI*2);
-
-    if(target && i<target.length){
-      // TEKS: putih solid + halo tipis
-      ctx.fillStyle="rgba(255,255,255,0.95)";
-      ctx.shadowBlur=8;
-      ctx.shadowColor="rgba(255,255,255,0.35)";
-    }else{
-      // BINTANG: warna + depth
-      ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},0.85)`;
-      ctx.shadowBlur=0;
-    }
-
+    ctx.arc(p.x*s,p.y*s,radius,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.r},${p.g},${p.b},${0.75+glow})`;
+    ctx.shadowBlur=12*glow;
+    ctx.shadowColor=`rgba(${p.r},${p.g},${p.b},0.6)`;
     ctx.fill();
+    ctx.shadowBlur=0;
   });
 
   ctx.setTransform(1,0,0,1,0,0);
