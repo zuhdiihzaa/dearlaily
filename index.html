@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Dear Laily</title>
 
 <style>
@@ -15,94 +16,93 @@ html,body{
 }
 #status{
   position:fixed;
-  bottom:12px;
-  left:12px;
-  color:#8ab4ff;
-  font-size:13px;
+  bottom:10px;
+  left:10px;
+  font-size:12px;
+  color:#9ab6ff;
   z-index:10;
 }
-#camBox{
+#cam{
   position:fixed;
-  top:12px;
-  right:12px;
-  width:140px;
+  top:10px;
+  right:10px;
+  width:120px;
   aspect-ratio:1/1;
   border-radius:14px;
   overflow:hidden;
   border:2px dashed rgba(255,255,255,.4);
-  z-index:5;
 }
 video{
   width:100%;
   height:100%;
   object-fit:cover;
-  transform:scaleX(1); /* no mirror */
 }
 </style>
 </head>
 
 <body>
-<div id="camBox">
-  <video id="video" autoplay playsinline muted></video>
-</div>
-<div id="status">idle</div>
+<div id="cam"><video id="video" autoplay playsinline muted></video></div>
+<div id="status">initializing</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 
 <script>
-/* =====================
-   DEVICE DETECT
-===================== */
+/* =========================
+   ORIENTATION (BEST EFFORT)
+========================= */
+if(screen.orientation && screen.orientation.lock){
+  screen.orientation.lock("portrait").catch(()=>{});
+}
+
 const IS_MOBILE = innerWidth < 768;
 
-/* =====================
-   THREE
-===================== */
+/* =========================
+   THREE SETUP
+========================= */
 const scene = new THREE.Scene();
-const cam3D = new THREE.PerspectiveCamera(
+const camera = new THREE.PerspectiveCamera(
   60,
   innerWidth/innerHeight,
   0.1,
   1000
 );
-cam3D.position.z = IS_MOBILE ? 55 : 65;
+camera.position.z = 42;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 document.body.appendChild(renderer.domElement);
 
-/* =====================
-   STAR TEXTURE (ROUND)
-===================== */
-const sc=document.createElement("canvas");
-sc.width=sc.height=64;
-const sctx=sc.getContext("2d");
-const g=sctx.createRadialGradient(32,32,2,32,32,32);
+/* =========================
+   ROUND STAR TEXTURE
+========================= */
+const c=document.createElement("canvas");
+c.width=c.height=64;
+const ctx=c.getContext("2d");
+const g=ctx.createRadialGradient(32,32,4,32,32,32);
 g.addColorStop(0,"white");
 g.addColorStop(1,"transparent");
-sctx.fillStyle=g;
-sctx.beginPath();
-sctx.arc(32,32,32,0,Math.PI*2);
-sctx.fill();
+ctx.fillStyle=g;
+ctx.beginPath();
+ctx.arc(32,32,32,0,Math.PI*2);
+ctx.fill();
+const starTex=new THREE.CanvasTexture(c);
 
-const starTex=new THREE.CanvasTexture(sc);
-
-/* =====================
-   STARS
-===================== */
-const COUNT=1500;
+/* =========================
+   PARTICLES
+========================= */
+const COUNT=3000;
 const geo=new THREE.BufferGeometry();
 const pos=new Float32Array(COUNT*3);
 const base=new Float32Array(COUNT*3);
 
 for(let i=0;i<COUNT;i++){
   const i3=i*3;
-  pos[i3]=(Math.random()-0.5)*120;
+  pos[i3]=(Math.random()-0.5)*100;
   pos[i3+1]=(Math.random()-0.5)*120;
-  pos[i3+2]=(Math.random()-0.5)*120;
+  pos[i3+2]=(Math.random()-0.5)*80;
   base.set(pos.slice(i3,i3+3),i3);
 }
 geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
@@ -111,48 +111,48 @@ const mat=new THREE.PointsMaterial({
   map:starTex,
   transparent:true,
   depthWrite:false,
-  size:0.85
+  size:0.9
 });
-const stars=new THREE.Points(geo,mat);
-scene.add(stars);
+const points=new THREE.Points(geo,mat);
+scene.add(points);
 
-/* =====================
-   RESPONSIVE TEXT TARGET
-===================== */
-function buildText(text){
-  const c=document.createElement("canvas");
-  c.width=IS_MOBILE?700:900;
-  c.height=IS_MOBILE?200:260;
+/* =========================
+   TEXT TARGET (PORTRAIT)
+========================= */
+function makeText(text){
+  const tc=document.createElement("canvas");
+  tc.width=600;
+  tc.height=300;
+  const tctx=tc.getContext("2d");
+  tctx.fillStyle="white";
+  tctx.textAlign="center";
+  tctx.font="56px serif";
+  tctx.fillText(text, tc.width/2, tc.height/2+20);
 
-  const ctx=c.getContext("2d");
-  ctx.fillStyle="white";
-  ctx.textAlign="center";
-  ctx.font=`${IS_MOBILE?48:72}px serif`;
-  ctx.fillText(text,c.width/2,c.height/2+20);
+  const d=tctx.getImageData(0,0,tc.width,tc.height).data;
+  const arr=[];
+  const scale=0.22;
 
-  const d=ctx.getImageData(0,0,c.width,c.height).data;
-  const scale=IS_MOBILE?0.28:0.35;
-  const t=[];
-  for(let y=0;y<c.height;y+=4){
-    for(let x=0;x<c.width;x+=4){
-      if(d[(y*c.width+x)*4+3]>150){
-        t.push({
-          x:(x-c.width/2)*scale,
-          y:(c.height/2-y)*scale,
+  for(let y=0;y<tc.height;y+=3){
+    for(let x=0;x<tc.width;x+=3){
+      if(d[(y*tc.width+x)*4+3]>150){
+        arr.push({
+          x:(x-tc.width/2)*scale,
+          y:(tc.height/2-y)*scale,
           z:0
         });
       }
     }
   }
-  return t;
+  return arr;
 }
 
-const TARGET=buildText("Dear Laily");
+const TEXT_TARGET = makeText("Dear Laily");
 let showText=false;
 
-/* =====================
+/* =========================
    MEDIAPIPE
-===================== */
+========================= */
 const video=document.getElementById("video");
 const status=document.getElementById("status");
 
@@ -166,11 +166,13 @@ hands.setOptions({
   minTrackingConfidence:0.7
 });
 
-let lastSeen=0;
+let handVisible=false;
+let lastHandTime=0;
 
 hands.onResults(r=>{
-  if(r.multiHandLandmarks){
-    lastSeen=performance.now();
+  if(r.multiHandLandmarks && r.multiHandLandmarks.length){
+    handVisible=true;
+    lastHandTime=performance.now();
     status.textContent="detecting";
 
     const lm=r.multiHandLandmarks[0];
@@ -185,61 +187,52 @@ hands.onResults(r=>{
   }
 });
 
-/* =====================
-   CAMERA (ANTI FREEZE)
-===================== */
-let processing=false;
-let lastFrame=0;
-const FRAME_INTERVAL=80;
+/* =========================
+   CAMERA LOOP (ANTI-DEAD)
+========================= */
+let busy=false;
 
-const camUtil=new Camera(video,{
+const cam=new Camera(video,{
   onFrame: async ()=>{
-    const now=performance.now();
-    if(processing) return;
-    if(now-lastFrame<FRAME_INTERVAL) return;
-
-    processing=true;
-    lastFrame=now;
-
+    if(busy) return;
+    busy=true;
     try{
       await hands.send({image:video});
-    }catch(e){
-      console.warn("hands error",e);
-    }finally{
-      processing=false;
-    }
+    }catch(e){}
+    busy=false;
   },
   width:640,
   height:640
 });
-camUtil.start();
+cam.start();
 
-/* =====================
-   LOOP
-===================== */
+/* =========================
+   ANIMATE
+========================= */
 function animate(){
   requestAnimationFrame(animate);
 
-  if(performance.now()-lastSeen>1200){
-    status.textContent="idle";
+  if(handVisible && performance.now()-lastHandTime>1500){
+    handVisible=false;
     showText=false;
+    status.textContent="idle";
   }
 
   const p=geo.attributes.position.array;
   for(let i=0;i<COUNT;i++){
     const i3=i*3;
     let tx,ty,tz;
-    if(showText && i<TARGET.length){
-      ({x:tx,y:ty,z:tz}=TARGET[i]);
+    if(showText && i<TEXT_TARGET.length){
+      ({x:tx,y:ty,z:tz}=TEXT_TARGET[i]);
     }else{
       tx=base[i3];ty=base[i3+1];tz=base[i3+2];
     }
-    p[i3]+= (tx-p[i3])*0.08;
-    p[i3+1]+= (ty-p[i3+1])*0.08;
-    p[i3+2]+= (tz-p[i3+2])*0.08;
+    p[i3]+= (tx-p[i3])*0.09;
+    p[i3+1]+= (ty-p[i3+1])*0.09;
+    p[i3+2]+= (tz-p[i3+2])*0.09;
   }
   geo.attributes.position.needsUpdate=true;
-  renderer.render(scene,cam3D);
+  renderer.render(scene,camera);
 }
 animate();
 </script>
