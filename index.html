@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>Dear Laily</title>
 
 <style>
@@ -34,7 +34,7 @@ canvas{position:fixed;inset:0}
   top:10px;left:50%;
   transform:translateX(-50%);
   color:#fff;opacity:.5;
-  font-size:clamp(12px,3vw,15px);
+  font-size:14px;
   z-index:10
 }
 </style>
@@ -57,40 +57,36 @@ resize();addEventListener("resize",resize);
 /* ================= STATE ================= */
 let currentState="idle";
 let lastHandTime=Date.now();
-let restarting=false;
 
-/* ================= GALAXY ================= */
-let t=0;
+/* ================= GALAXY (OPTIMIZED) ================= */
+let gT=0;
 function drawGalaxy(){
-  t+=0.0015;
+  gT+=0.0015;
   ctx.fillStyle="#000";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  for(let i=1;i<=3;i++){
-    const d=i;
-    const x=canvas.width/2+Math.sin(t*(0.7/d))*160/d;
-    const y=canvas.height/2+Math.cos(t*(0.5/d))*160/d;
-    const r=canvas.width*(0.5+0.25*d);
-    const g=ctx.createRadialGradient(x,y,0,x,y,r);
-    g.addColorStop(0,`rgba(90,70,160,${0.05/d})`);
-    g.addColorStop(0.4,`rgba(40,20,90,${0.08/d})`);
-    g.addColorStop(1,"rgba(0,0,0,1)");
-    ctx.fillStyle=g;
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-  }
+  const x=canvas.width/2+Math.sin(gT)*120;
+  const y=canvas.height/2+Math.cos(gT*0.7)*120;
+  const r=canvas.width*0.9;
+
+  const grad=ctx.createRadialGradient(x,y,0,x,y,r);
+  grad.addColorStop(0,"rgba(80,60,150,0.08)");
+  grad.addColorStop(0.5,"rgba(30,20,70,0.15)");
+  grad.addColorStop(1,"#000");
+
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
 /* ================= PARTICLES ================= */
 const COUNT=2600;
 const particles=[],base=[];
 for(let i=0;i<COUNT;i++){
-  const depth=Math.random();
   const p={
     x:(Math.random()-.5)*canvas.width,
     y:(Math.random()-.5)*canvas.height,
-    z:depth*900,
-    hue:200+Math.random()*120,
-    depth
+    z:Math.random()*900,
+    hue:200+Math.random()*120
   };
   particles.push(p);base.push({...p});
 }
@@ -147,11 +143,10 @@ for the misunderstanding.`),
 };
 
 /* ================= ANIMATE ================= */
-let pulse=0;
 function animate(){
   drawGalaxy();
+  ctx.save();
   ctx.translate(canvas.width/2,canvas.height/2);
-  pulse+=0.05;
 
   const target=TARGETS[currentState];
 
@@ -166,69 +161,55 @@ function animate(){
       isText=true;
     }
 
-    if(currentState==="four"&&isText){
-      const beat=1+Math.sin(pulse)*0.04;
-      tx*=beat; ty*=beat;
-    }
-
     p.x+=(tx-p.x)*0.085;
     p.y+=(ty-p.y)*0.085;
     p.z+=(tz-p.z)*0.085;
 
     const s=750/(750+p.z);
+
     ctx.beginPath();
     ctx.arc(p.x*s,p.y*s,isText?2.2*s:1.2*s,0,Math.PI*2);
 
     if(isText){
-      ctx.shadowBlur=12;
-      ctx.shadowColor="rgba(255,255,255,0.8)";
-      ctx.fillStyle="rgba(255,255,255,0.98)";
+      ctx.shadowBlur=6;
+      ctx.shadowColor="rgba(255,255,255,0.6)";
+      ctx.fillStyle="#fff";
     }else{
       ctx.shadowBlur=0;
-      ctx.fillStyle=`hsla(${p.hue},70%,60%,0.35)`;
+      ctx.fillStyle=`hsla(${p.hue},70%,60%,0.3)`;
     }
     ctx.fill();
   });
 
-  ctx.shadowBlur=0;
-  ctx.setTransform(1,0,0,1,0,0);
+  ctx.restore();
   requestAnimationFrame(animate);
 }
 animate();
 
 /* ================= MEDIAPIPE ================= */
 const video=document.getElementById("video");
-let camera,hands;
+const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+hands.setOptions({
+  maxNumHands:1,
+  minDetectionConfidence:0.6,
+  minTrackingConfidence:0.6
+});
 
-function initHands(){
-  hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-  hands.setOptions({maxNumHands:1,minDetectionConfidence:0.6,minTrackingConfidence:0.6});
-  hands.onResults(r=>{
-    if(!r.multiHandLandmarks){currentState="idle";return;}
-    lastHandTime=Date.now();
-    const lm=r.multiHandLandmarks[0];
-    let f=0;[8,12,16,20].forEach(t=>lm[t].y<lm[t-2].y&&f++);
-    if(lm[4].x<lm[3].x) f++;
-    currentState=["fist","one","two","three","four","five"][Math.min(5,f)];
-  });
-}
-function startCamera(){
-  camera=new Camera(video,{onFrame:async()=>hands.send({image:video}),width:360,height:480});
-  camera.start();
-}
-function restartPipeline(){
-  if(restarting)return;
-  restarting=true;
-  camera.stop();
-  setTimeout(()=>{initHands();startCamera();restarting=false;},400);
-}
-setInterval(()=>{
-  if(Date.now()-lastHandTime>1200){
-    restartPipeline();lastHandTime=Date.now();
-  }
-},500);
+hands.onResults(r=>{
+  if(!r.multiHandLandmarks){currentState="idle";return;}
+  lastHandTime=Date.now();
+  const lm=r.multiHandLandmarks[0];
+  let f=0;
+  [8,12,16,20].forEach(t=>lm[t].y<lm[t-2].y&&f++);
+  if(lm[4].x<lm[3].x) f++;
+  currentState=["fist","one","two","three","four","five"][Math.min(5,f)];
+});
 
-initHands();startCamera();
+const camera=new Camera(video,{
+  onFrame:async()=>hands.send({image:video}),
+  width:360,height:480
+});
+camera.start();
 </script>
 </body>
 </html>
