@@ -59,12 +59,16 @@ resize();addEventListener("resize",resize);
 
 /* ================= STATE ================= */
 let currentState="idle";
+let prevState="idle";
 let lastHandTime=Date.now();
 let restarting=false;
 
+/* ================= TRANSITION ================= */
+let transition=1; // 0 → 1
+const TRANSITION_SPEED=0.035;
+
 /* ================= PARALLAX ================= */
-let px=0,py=0;       // posisi target
-let spx=0,spy=0;     // smooth position
+let px=0,py=0,spx=0,spy=0;
 
 /* ================= NEBULA ================= */
 const nebula=document.createElement("canvas");
@@ -158,7 +162,7 @@ for the misunderstanding.`),
 function animate(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // nebula parallax ringan
+  // nebula
   spx+=(px-spx)*0.04;
   spy+=(py-spy)*0.04;
   ctx.drawImage(nebula,spx*0.04,spy*0.04);
@@ -166,11 +170,21 @@ function animate(){
   ctx.translate(canvas.width/2,canvas.height/2);
 
   const target=TARGETS[currentState];
+  if(prevState!==currentState){
+    transition=0;
+    prevState=currentState;
+  }
+  transition=Math.min(1,transition+TRANSITION_SPEED);
+  const ease=transition*transition*(3-2*transition);
+
   particles.forEach((p,i)=>{
     let tx=base[i].x,ty=base[i].y,tz=base[i].z;
     if(target&&i<target.length){
-      tx=target[i].x;ty=target[i].y;tz=0;
+      tx=target[i].x;
+      ty=target[i].y;
+      tz=300*(1-ease); // cinematic pull
     }
+
     p.x+=(tx-p.x)*0.085;
     p.y+=(ty-p.y)*0.085;
     p.z+=(tz-p.z)*0.085;
@@ -183,8 +197,8 @@ function animate(){
     ctx.arc(dx,dy,1.4*s,0,Math.PI*2);
 
     if(target&&i<target.length){
-      ctx.fillStyle="rgba(255,255,255,0.95)";
-      ctx.shadowBlur=10;
+      ctx.fillStyle=`rgba(255,255,255,${0.3+0.7*ease})`;
+      ctx.shadowBlur=12;
       ctx.shadowColor="rgba(255,255,255,0.35)";
     }else{
       ctx.fillStyle=`hsla(${p.hue},80%,75%,0.9)`;
@@ -218,27 +232,17 @@ function initHands(){
       currentState="idle";
       return;
     }
-
     lastHandTime=Date.now();
     const lm=res.multiHandLandmarks[0];
-
-    // parallax dari telapak
     px=(lm[0].x-.5)*80;
     py=(lm[0].y-.5)*80;
 
     let fingers=0;
-    const tips=[8,12,16,20];
-    tips.forEach(t=>{ if(lm[t].y<lm[t-2].y) fingers++; });
+    [8,12,16,20].forEach(t=>{ if(lm[t].y<lm[t-2].y) fingers++; });
     if(lm[4].x<lm[3].x) fingers++;
 
     fingers=Math.max(0,Math.min(5,fingers));
-
-    if(fingers===0) currentState="fist";
-    else if(fingers===1) currentState="one";
-    else if(fingers===2) currentState="two";
-    else if(fingers===3) currentState="three";
-    else if(fingers===4) currentState="four";
-    else if(fingers===5) currentState="five";
+    currentState=["fist","one","two","three","four","five"][fingers];
   });
 }
 
