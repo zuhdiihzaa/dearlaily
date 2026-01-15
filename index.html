@@ -68,7 +68,7 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.z = 42;
+camera.position.z = innerWidth < 768 ? 52 : 42;
 
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
@@ -120,25 +120,56 @@ scene.add(points);
    TEXT TARGET (PORTRAIT)
 ========================= */
 function makeText(text){
-  const tc=document.createElement("canvas");
-  tc.width=600;
-  tc.height=300;
-  const tctx=tc.getContext("2d");
+  const isMobile = innerWidth < 768;
+
+  const tc = document.createElement("canvas");
+  tc.width  = isMobile ? 520 : 800;
+  tc.height = isMobile ? 520 : 400;
+
+  const tctx = tc.getContext("2d");
+  tctx.clearRect(0,0,tc.width,tc.height);
   tctx.fillStyle="white";
   tctx.textAlign="center";
-  tctx.font="56px serif";
-  tctx.fillText(text, tc.width/2, tc.height/2+20);
+  tctx.textBaseline="middle";
 
-  const d=tctx.getImageData(0,0,tc.width,tc.height).data;
+  const fontSize = isMobile ? 30 : 46;
+  tctx.font = `${fontSize}px serif`;
+
+  // === WORD WRAP ===
+  const words = text.split(" ");
+  let lines=[];
+  let line="";
+  const maxWidth = tc.width * 0.85;
+
+  for(let w of words){
+    const test = line + w + " ";
+    if(tctx.measureText(test).width > maxWidth){
+      lines.push(line);
+      line = w + " ";
+    }else{
+      line = test;
+    }
+  }
+  lines.push(line);
+
+  const lineHeight = fontSize * 1.4;
+  const startY = tc.height/2 - (lines.length-1)*lineHeight/2;
+
+  lines.forEach((l,i)=>{
+    tctx.fillText(l.trim(), tc.width/2, startY + i*lineHeight);
+  });
+
+  // === SAMPLE PIXELS ===
+  const data = tctx.getImageData(0,0,tc.width,tc.height).data;
   const arr=[];
-  const scale=0.22;
+  const scale = isMobile ? 0.18 : 0.22;
 
   for(let y=0;y<tc.height;y+=3){
     for(let x=0;x<tc.width;x+=3){
-      if(d[(y*tc.width+x)*4+3]>150){
+      if(data[(y*tc.width+x)*4+3] > 150){
         arr.push({
-          x:(x-tc.width/2)*scale,
-          y:(tc.height/2-y)*scale,
+          x:(x - tc.width/2)*scale,
+          y:(tc.height/2 - y)*scale,
           z:0
         });
       }
